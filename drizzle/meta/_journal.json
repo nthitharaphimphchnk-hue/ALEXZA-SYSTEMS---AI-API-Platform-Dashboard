@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1770008030391,
+      "tag": "0000_wooden_whiplash",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1770008495169,
+      "tag": "0001_huge_quasar",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1738500000000,
+      "tag": "0002_usage_logs_error_message",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1738500100000,
+      "tag": "0003_billing_plans_project_billing",
+      "breakpoints": true
+    }
+  ]
+}
