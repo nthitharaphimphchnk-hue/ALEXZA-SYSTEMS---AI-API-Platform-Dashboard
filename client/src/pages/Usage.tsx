@@ -11,6 +11,8 @@ import { useParams } from "wouter";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -32,6 +34,33 @@ export default function Usage() {
     { projectId: projectId!, hours: parseInt(timeRange) },
     { enabled: !!projectId }
   );
+
+  const currentBillingMonth = new Date().toISOString().slice(0, 7);
+  const { data: dailyStats, isLoading: dailyStatsLoading } = trpc.usage.getDailyStats.useQuery(
+    { projectId: projectId!, billingMonth: currentBillingMonth },
+    { enabled: !!projectId }
+  );
+
+  const dailyChartData = (dailyStats ?? []).map((row) => ({
+    date: row.date,
+    label: new Date(row.date + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    requests: row.requestCount,
+    success: row.successCount,
+    error: row.errorCount,
+    creditsUsed: row.creditsUsed,
+  }));
+
+  const trend =
+    dailyChartData.length >= 2
+      ? (() => {
+          const mid = Math.floor(dailyChartData.length / 2);
+          const firstHalf = dailyChartData.slice(0, mid).reduce((s, d) => s + d.requests, 0);
+          const secondHalf = dailyChartData.slice(mid).reduce((s, d) => s + d.requests, 0);
+          if (secondHalf > firstHalf) return { direction: "up" as const, label: "เพิ่มขึ้น" };
+          if (secondHalf < firstHalf) return { direction: "down" as const, label: "ลดลง" };
+          return { direction: "flat" as const, label: "คงที่" };
+        })()
+      : null;
 
   const chartData = hourlyData?.map((item) => ({
     hour: new Date(item.hour).toLocaleTimeString("en-US", {
@@ -146,6 +175,79 @@ export default function Usage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Daily usage this month (stacked success vs error + trend) */}
+        <Card className="border-border/50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Daily Usage This Month</CardTitle>
+                <CardDescription>
+                  Requests and credits by day · Success vs error (stacked)
+                </CardDescription>
+              </div>
+              {trend && (
+                <span
+                  className={`text-sm font-medium ${
+                    trend.direction === "up"
+                      ? "text-chart-2"
+                      : trend.direction === "down"
+                        ? "text-muted-foreground"
+                        : "text-muted-foreground"
+                  }`}
+                >
+                  แนวโน้ม: {trend.label}
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {dailyStatsLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : dailyChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dailyChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <XAxis
+                    dataKey="label"
+                    stroke="oklch(0.6 0 0)"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="oklch(0.6 0 0)"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "oklch(0.16 0 0)",
+                      border: "1px solid oklch(0.28 0 0)",
+                      borderRadius: "8px",
+                    }}
+                    labelStyle={{ color: "oklch(0.95 0 0)" }}
+                    formatter={(value: number, name: string) => [
+                      value,
+                      name === "success" ? "Success" : name === "error" ? "Error" : "Credits",
+                    ]}
+                  />
+                  <Bar dataKey="success" name="Success" stackId="a" fill="oklch(0.55 0.2 145)" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="error" name="Error" stackId="a" fill="oklch(0.55 0.2 25)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center">
+                <EmptyState
+                  icon={BarChart3}
+                  title={t("empty.noData")}
+                  description={t("empty.noDataDesc")}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-2">

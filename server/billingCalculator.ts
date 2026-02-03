@@ -1,9 +1,8 @@
 /**
  * Billing calculator - credit-based model, configurable in code.
- * Source of truth: usage_logs. 1 API request = 1 credit (initial rule).
+ * Source of truth: MongoDB usageLogs. 1 API request = 1 credit (initial rule).
  */
 
-import type { UsageLog } from "../drizzle/schema";
 import * as db from "./db";
 
 // ---------------------------------------------------------------------------
@@ -27,12 +26,12 @@ export const BILLING_CONFIG = {
  * Calculate total credits from usage logs.
  * Isolated so pricing rules can change without touching DB or routers.
  */
-export function calculateCreditsFromUsage(usageLogs: UsageLog[]): number {
-  return usageLogs.length * BILLING_CONFIG.CREDITS_PER_REQUEST;
+export function calculateCreditsFromUsage(usageCount: number): number {
+  return usageCount * BILLING_CONFIG.CREDITS_PER_REQUEST;
 }
 
 // ---------------------------------------------------------------------------
-// Project usage & quota (async, use DB)
+// Project usage & quota (async, usageLogs as source of truth)
 // ---------------------------------------------------------------------------
 
 export type UsageSummary = {
@@ -45,28 +44,36 @@ export type UsageSummary = {
 
 /**
  * Get usage summary for a project in its current billing period.
- * Uses usage_logs as source of truth.
+ * Uses usageLogs as source of truth and a simple free plan (no Stripe).
  */
-export async function getProjectUsageSummary(projectId: number): Promise<UsageSummary | null> {
-  const pb = await db.getOrCreateProjectBilling(projectId);
-  if (!pb) return null;
-
-  const plan = await db.getBillingPlanById(pb.planId);
-  if (!plan) return null;
+export async function getProjectUsageSummary(
+  projectId: number
+): Promise<UsageSummary | null> {
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
 
   const logs = await db.getUsageLogsForProjectInPeriod(
     projectId,
-    new Date(pb.currentPeriodStart),
-    new Date(pb.currentPeriodEnd)
+    periodStart,
+    periodEnd
   );
-  const creditsUsed = calculateCreditsFromUsage(logs);
+  const creditsUsed = calculateCreditsFromUsage(logs.length);
 
   return {
     creditsUsed,
-    periodStart: new Date(pb.currentPeriodStart),
-    periodEnd: new Date(pb.currentPeriodEnd),
-    quota: plan.monthlyCreditQuota,
-    planName: plan.name,
+    periodStart,
+    periodEnd,
+    quota: BILLING_CONFIG.FREE_TRIAL_CREDITS,
+    planName: "free",
   };
 }
 
@@ -90,7 +97,10 @@ export async function getQuotaStatus(projectId: number): Promise<{
   let status: QuotaStatus = "normal";
   if (creditsUsed >= quota) {
     status = "over_quota";
-  } else if (quota > 0 && creditsUsed >= quota * BILLING_CONFIG.NEARING_LIMIT_THRESHOLD) {
+  } else if (
+    quota > 0 &&
+    creditsUsed >= quota * BILLING_CONFIG.NEARING_LIMIT_THRESHOLD
+  ) {
     status = "nearing_limit";
   }
 
@@ -117,11 +127,16 @@ export type BillingPreview = {
 /**
  * Get billing preview for a project (usage + quota in one).
  */
-export async function getBillingPreview(projectId: number): Promise<BillingPreview | null> {
+export async function getBillingPreview(
+  projectId: number
+): Promise<BillingPreview | null> {
   const quotaStatus = await getQuotaStatus(projectId);
   if (!quotaStatus) return null;
 
-  const creditsRemaining = Math.max(0, quotaStatus.quota - quotaStatus.creditsUsed);
+  const creditsRemaining = Math.max(
+    0,
+    quotaStatus.quota - quotaStatus.creditsUsed
+  );
 
   return {
     creditsUsed: quotaStatus.creditsUsed,

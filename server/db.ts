@@ -1,362 +1,327 @@
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, projects, apiKeys, usageLogs, billing, billingPlans, projectBilling, InsertProject, InsertApiKey, InsertUsageLog, InsertBilling, Project, ApiKey, UsageLog } from "../drizzle/schema";
-import { ENV } from './_core/env';
-import { createHash, randomBytes } from 'crypto';
+import type { Collection, WithId } from "mongodb";
+import { ENV } from "./_core/env";
+import { getCollection, getNextSequence } from "./db/mongo";
+import {
+  getUsageByBillingMonth,
+  getUsageByHour as mongoGetUsageByHour,
+  getUsageLogsForProjectInPeriod as mongoGetUsageLogsForProjectInPeriod,
+  getUsageStats as mongoGetUsageStats,
+  type UsageLog as MongoUsageLog,
+} from "./db/usageLogService";
+import { logUsage as logUsageService } from "./services/usageLogService";
+import * as apiKeyService from "./services/apiKeyService";
+import * as projectService from "./services/projectService";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+// ---------------------------------------------------------------------------
+// Shared document types (numeric ids, Mongo-backed)
+// ---------------------------------------------------------------------------
 
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
-  }
-  return _db;
+export type User = {
+  id: number;
+  openId: string;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  role: "user" | "admin";
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date;
+};
+
+export type Project = {
+  id: number;
+  userId: number;
+  name: string;
+  description?: string | null;
+  environment: "development" | "staging" | "production";
+  status: "active" | "inactive" | "suspended" | "archived";
+  planId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ApiKey = {
+  id: number;
+  projectId: number;
+  name: string;
+  keyHash: string;
+  keyPrefix: string;
+  isActive: boolean;
+  lastUsedAt?: Date | null;
+  expiresAt?: Date | null;
+  createdAt: Date;
+  revokedAt?: Date | null;
+};
+
+export type UsageLog = MongoUsageLog;
+
+// ---------------------------------------------------------------------------
+// Collection helpers
+// ---------------------------------------------------------------------------
+
+async function usersCollection(): Promise<Collection<User>> {
+  return getCollection<User>("users");
 }
 
-// ============ USER OPERATIONS ============
+// ---------------------------------------------------------------------------
+// User operations
+// ---------------------------------------------------------------------------
 
-export async function upsertUser(user: InsertUser): Promise<void> {
+export async function upsertUser(
+  user: Partial<User> & { openId: string }
+): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
   }
 
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
+  const col = await usersCollection();
+  const now = new Date();
 
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
+  const existing = await col.findOne({ openId: user.openId });
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
+  const base: Omit<User, "id"> = {
+    openId: user.openId,
+    name: (user.name ?? existing?.name) ?? null,
+    email: (user.email ?? existing?.email) ?? null,
+    loginMethod: (user.loginMethod ?? existing?.loginMethod) ?? null,
+    role:
+      user.role ??
+      existing?.role ??
+      (user.openId === ENV.ownerOpenId ? "admin" : "user"),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    lastSignedIn: user.lastSignedIn ?? now,
+  };
 
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
+  if (existing) {
+    await col.updateOne({ openId: user.openId }, { $set: base });
+  } else {
+    const id = await getNextSequence("users");
+    await col.insertOne({ id, ...base });
   }
 }
 
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
-}
-
-// ============ PROJECT OPERATIONS ============
-
-export async function createProject(data: Omit<InsertProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(projects).values(data);
-  const insertId = result[0].insertId;
-  
-  const [project] = await db.select().from(projects).where(eq(projects.id, insertId));
-  return project;
-}
-
-export async function getProjectsByUserId(userId: number): Promise<Project[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  return db.select().from(projects).where(eq(projects.userId, userId)).orderBy(desc(projects.createdAt));
-}
-
-export async function getProjectById(projectId: number, userId: number): Promise<Project | undefined> {
-  const db = await getDb();
-  if (!db) return undefined;
-
-  const [project] = await db.select().from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-  return project;
-}
-
-export async function updateProject(projectId: number, userId: number, data: Partial<Pick<Project, 'name' | 'description' | 'environment' | 'status'>>): Promise<Project | undefined> {
-  const db = await getDb();
-  if (!db) return undefined;
-
-  await db.update(projects).set(data).where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-  return getProjectById(projectId, userId);
-}
-
-export async function deleteProject(projectId: number, userId: number): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
-
-  const result = await db.delete(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-  return result[0].affectedRows > 0;
-}
-
-// ============ API KEY OPERATIONS ============
-
-function generateApiKey(): { key: string; hash: string; prefix: string } {
-  const key = `tti_${randomBytes(32).toString('hex')}`;
-  const hash = createHash('sha256').update(key).digest('hex');
-  const prefix = key.substring(0, 12);
-  return { key, hash, prefix };
-}
-
-export async function createApiKey(projectId: number, name: string): Promise<{ apiKey: ApiKey; plainKey: string }> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const { key, hash, prefix } = generateApiKey();
-
-  const result = await db.insert(apiKeys).values({
-    projectId,
-    name,
-    keyHash: hash,
-    keyPrefix: prefix,
-  });
-
-  const [apiKey] = await db.select().from(apiKeys).where(eq(apiKeys.id, result[0].insertId));
-  return { apiKey, plainKey: key };
-}
-
-export async function getApiKeysByProjectId(projectId: number): Promise<ApiKey[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  return db.select().from(apiKeys)
-    .where(and(eq(apiKeys.projectId, projectId), eq(apiKeys.isActive, true)))
-    .orderBy(desc(apiKeys.createdAt));
-}
-
-export async function revokeApiKey(keyId: number, projectId: number): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
-
-  const result = await db.update(apiKeys)
-    .set({ isActive: false, revokedAt: new Date() })
-    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.projectId, projectId)));
-  
-  return result[0].affectedRows > 0;
-}
-
-// ============ USAGE OPERATIONS ============
-
-export async function logUsage(data: Omit<InsertUsageLog, 'id' | 'createdAt'>): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-
-  await db.insert(usageLogs).values(data);
-}
-
-export async function getUsageStats(projectId: number, hours: number = 24) {
-  const db = await getDb();
-  if (!db) return { totalRequests: 0, successRate: 0, avgResponseTime: 0, totalCost: 0 };
-
-  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-
-  const result = await db.select({
-    totalRequests: sql<number>`COUNT(*)`,
-    successCount: sql<number>`SUM(CASE WHEN ${usageLogs.statusCode} < 400 THEN 1 ELSE 0 END)`,
-    avgResponseTime: sql<number>`AVG(${usageLogs.responseTimeMs})`,
-    totalCost: sql<number>`SUM(${usageLogs.cost})`,
-  }).from(usageLogs)
-    .where(and(eq(usageLogs.projectId, projectId), gte(usageLogs.createdAt, since)));
-
-  const stats = result[0];
+export async function getUserByOpenId(
+  openId: string
+): Promise<(User & { _id?: unknown }) | undefined> {
+  const col = await usersCollection();
+  const user = await col.findOne({ openId });
+  if (!user) return undefined;
   return {
-    totalRequests: stats?.totalRequests ?? 0,
-    successRate: stats?.totalRequests ? ((stats.successCount ?? 0) / stats.totalRequests) * 100 : 0,
-    avgResponseTime: Math.round(stats?.avgResponseTime ?? 0),
-    totalCost: stats?.totalCost ?? 0,
+    ...user,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    loginMethod: user.loginMethod ?? null,
   };
 }
 
-export async function getUsageByHour(projectId: number, hours: number = 24) {
-  const db = await getDb();
-  if (!db) return [];
+// ---------------------------------------------------------------------------
+// Project operations (MongoDB via projectService)
+// ---------------------------------------------------------------------------
 
-  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-
-  return db.select({
-    hour: sql<string>`DATE_FORMAT(${usageLogs.createdAt}, '%Y-%m-%d %H:00:00')`,
-    requests: sql<number>`COUNT(*)`,
-    cost: sql<number>`SUM(${usageLogs.cost})`,
-  }).from(usageLogs)
-    .where(and(eq(usageLogs.projectId, projectId), gte(usageLogs.createdAt, since)))
-    .groupBy(sql`DATE_FORMAT(${usageLogs.createdAt}, '%Y-%m-%d %H:00:00')`)
-    .orderBy(sql`hour`);
-}
-
-// ============ BILLING OPERATIONS ============
-
-export async function getOrCreateBilling(projectId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const now = new Date();
-  const cycleStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const cycleEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-  const [existing] = await db.select().from(billing)
-    .where(and(
-      eq(billing.projectId, projectId),
-      gte(billing.billingCycleEnd, now)
-    ))
-    .limit(1);
-
-  if (existing) return existing;
-
-  const result = await db.insert(billing).values({
-    projectId,
-    billingCycleStart: cycleStart,
-    billingCycleEnd: cycleEnd,
+export async function createProject(
+  data: Omit<Project, "id" | "createdAt" | "updatedAt">
+): Promise<Project> {
+  return projectService.createProject({
+    userId: data.userId,
+    name: data.name,
+    description: data.description ?? null,
+    environment: data.environment,
+    status: data.status,
   });
-
-  const [newBilling] = await db.select().from(billing).where(eq(billing.id, result[0].insertId));
-  return newBilling;
 }
 
-export async function updateBillingUsage(projectId: number, requestCount: number, cost: number) {
-  const db = await getDb();
-  if (!db) return;
-
-  const currentBilling = await getOrCreateBilling(projectId);
-  
-  await db.update(billing)
-    .set({
-      totalRequests: sql`${billing.totalRequests} + ${requestCount}`,
-      totalCost: sql`${billing.totalCost} + ${cost}`,
-      status: sql`CASE WHEN ${billing.totalRequests} + ${requestCount} >= ${billing.quotaLimit} THEN 'exceeded' ELSE 'active' END`,
-    })
-    .where(eq(billing.id, currentBilling.id));
+export async function getProjectsByUserId(userId: number): Promise<Project[]> {
+  return projectService.getProjectsByUser(userId);
 }
 
-export async function getBillingHistory(projectId: number, limit: number = 6) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return db.select().from(billing)
-    .where(eq(billing.projectId, projectId))
-    .orderBy(desc(billing.billingCycleStart))
-    .limit(limit);
+export async function getProjectById(
+  projectId: number,
+  userId: number
+): Promise<Project | undefined> {
+  return projectService.getProjectById(projectId, userId);
 }
 
-// ============ BILLING FOUNDATION (credit-based, usage_logs as source of truth) ============
+export async function updateProject(
+  projectId: number,
+  userId: number,
+  data: Partial<
+    Pick<Project, "name" | "description" | "environment" | "status">
+  >
+): Promise<Project | undefined> {
+  return projectService.updateProject(projectId, userId, data);
+}
+
+export async function deleteProject(
+  projectId: number,
+  userId: number
+): Promise<boolean> {
+  return projectService.deleteProject(projectId, userId);
+}
+
+// ---------------------------------------------------------------------------
+// API key operations (MongoDB via apiKeyService)
+// ---------------------------------------------------------------------------
+
+function mapToApiKey(doc: apiKeyService.ApiKeyDocument): ApiKey {
+  return {
+    id: doc.id,
+    projectId: doc.projectId,
+    name: doc.name,
+    keyHash: doc.keyHash,
+    keyPrefix: doc.keyPrefix,
+    isActive: doc.status === "active",
+    lastUsedAt: null,
+    expiresAt: null,
+    createdAt: doc.createdAt,
+    revokedAt: doc.revokedAt,
+  };
+}
+
+export async function createApiKey(
+  projectId: number,
+  name: string
+): Promise<{ apiKey: ApiKey; plainKey: string }> {
+  const { apiKey, plainKey } = await apiKeyService.createApiKey({ projectId, name });
+  return { apiKey: mapToApiKey(apiKey), plainKey };
+}
+
+export async function getApiKeysByProjectId(
+  projectId: number
+): Promise<ApiKey[]> {
+  const list = await apiKeyService.listApiKeys(projectId);
+  return list.map(mapToApiKey);
+}
+
+export async function revokeApiKey(
+  keyId: number,
+  projectId: number
+): Promise<boolean> {
+  return apiKeyService.revokeApiKey(keyId, projectId);
+}
+
+/** Resolve Bearer API key to projectId + apiKeyId. Returns null if invalid or revoked. */
+export async function getProjectIdFromApiKey(plainKey: string): Promise<{
+  projectId: number;
+  apiKeyId: number;
+} | null> {
+  return apiKeyService.findProjectIdByKey(plainKey);
+}
+
+// ---------------------------------------------------------------------------
+// Usage operations (MongoDB service layer)
+// ---------------------------------------------------------------------------
+
+/** Log usage via service layer (try/catch inside; never throws). usageLogs = source of truth for billing. */
+export async function logUsage(data: {
+  projectId: number;
+  apiKeyId?: number | null;
+  endpoint: string;
+  method: string;
+  statusCode: number;
+  responseTimeMs?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  cost?: number | null;
+  errorMessage?: string | null;
+}): Promise<void> {
+  await logUsageService({
+    projectId: data.projectId,
+    apiKeyId: data.apiKeyId ?? null,
+    success: data.statusCode < 400,
+    errorMessage: data.errorMessage ?? null,
+    responseTimeMs: data.responseTimeMs ?? 0,
+    endpoint: data.endpoint,
+    method: data.method,
+    statusCode: data.statusCode,
+    inputTokens: data.inputTokens,
+    outputTokens: data.outputTokens,
+    cost: data.cost,
+  });
+}
+
+export async function getUsageStats(
+  projectId: number,
+  hours: number = 24
+) {
+  return mongoGetUsageStats(projectId, hours);
+}
+
+export async function getUsageByHour(
+  projectId: number,
+  hours: number = 24
+) {
+  return mongoGetUsageByHour(projectId, hours);
+}
+
+// ---------------------------------------------------------------------------
+// Billing foundation (credit-based, usageLogs as source of truth)
+// ---------------------------------------------------------------------------
 
 export async function getUsageLogsForProjectInPeriod(
   projectId: number,
   periodStart: Date,
   periodEnd: Date
 ): Promise<UsageLog[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  const rows = await db.select().from(usageLogs)
-    .where(and(
-      eq(usageLogs.projectId, projectId),
-      gte(usageLogs.createdAt, periodStart),
-      lte(usageLogs.createdAt, periodEnd)
-    ))
-    .orderBy(usageLogs.createdAt);
-  return rows;
+  return mongoGetUsageLogsForProjectInPeriod(projectId, periodStart, periodEnd);
 }
 
-export async function getBillingPlanByName(name: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const [row] = await db.select().from(billingPlans).where(eq(billingPlans.name, name)).limit(1);
-  return row;
-}
+const DEFAULT_QUOTA_LIMIT = 10000;
 
-export async function getBillingPlanById(id: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const [row] = await db.select().from(billingPlans).where(eq(billingPlans.id, id)).limit(1);
-  return row;
-}
-
-export async function getProjectBilling(projectId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const [row] = await db.select().from(projectBilling).where(eq(projectBilling.projectId, projectId)).limit(1);
-  return row;
-}
-
-export async function getOrCreateProjectBilling(projectId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
+/** Current billing period derived from usageLogs (MongoDB). */
+export async function getOrCreateBilling(projectId: number) {
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const periodEnd = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
 
-  const existing = await getProjectBilling(projectId);
-  if (existing) {
-    const end = new Date(existing.currentPeriodEnd);
-    if (end < now) {
-      await db
-        .update(projectBilling)
-        .set({ currentPeriodStart: periodStart, currentPeriodEnd: periodEnd })
-        .where(eq(projectBilling.projectId, projectId));
-      const [updated] = await db.select().from(projectBilling).where(eq(projectBilling.projectId, projectId)).limit(1);
-      return updated!;
-    }
-    return existing;
-  }
-
-  const freePlan = await getBillingPlanByName("free");
-  if (!freePlan) throw new Error("Billing plan 'free' not found. Run migrations.");
-
-  await db.insert(projectBilling).values({
+  const logs = await mongoGetUsageLogsForProjectInPeriod(
     projectId,
-    planId: freePlan.id,
-    currentPeriodStart: periodStart,
-    currentPeriodEnd: periodEnd,
-  });
+    periodStart,
+    periodEnd
+  );
+  const totalRequests = logs.length;
+  const totalCost = logs.reduce((sum, l) => sum + (l.cost ?? 0), 0);
+  const status = totalRequests >= DEFAULT_QUOTA_LIMIT ? "exceeded" : "active";
 
-  const [row] = await db.select().from(projectBilling).where(eq(projectBilling.projectId, projectId)).limit(1);
-  return row!;
+  return {
+    id: 0,
+    projectId,
+    billingCycleStart: periodStart,
+    billingCycleEnd: periodEnd,
+    totalRequests,
+    quotaLimit: DEFAULT_QUOTA_LIMIT,
+    totalCost,
+    status,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/** Billing history derived from usageLogs grouped by month (MongoDB). */
+export async function getBillingHistory(projectId: number, limit: number = 6) {
+  const months = await getUsageByBillingMonth(projectId, limit);
+  return months.map((m, i) => {
+    const [y, mo] = m.billingMonth.split("-").map(Number);
+    const periodStart = new Date(y, mo - 1, 1);
+    const periodEnd = new Date(y, mo, 0, 23, 59, 59, 999);
+    const status =
+      m.totalRequests >= DEFAULT_QUOTA_LIMIT ? "exceeded" : "active";
+    return {
+      id: i + 1,
+      projectId,
+      billingCycleStart: periodStart,
+      billingCycleEnd: periodEnd,
+      totalRequests: m.totalRequests,
+      totalCost: m.totalCost,
+      status,
+    };
+  });
 }

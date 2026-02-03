@@ -1,0 +1,13 @@
+# Render Blueprint (optional). Or set in Dashboard: Build Command + Start Command + Env.
+services:
+  - type: web
+    name: alexza-systems
+    runtime: node
+    buildCommand: pnpm install && pnpm run build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: true
+      # Add in Dashboard: MONGODB_URI (required), OAUTH_*, JWT_SECRET, etc.
