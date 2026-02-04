@@ -13,6 +13,7 @@ import Usage from "./pages/Usage";
 import Billing from "./pages/Billing";
 import QuickStart from "./pages/QuickStart";
 import Settings from "./pages/Settings";
+import ProjectSettingsGeneral from "./pages/ProjectSettingsGeneral";
 
 function Router() {
   return (
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/project/:id" component={ProjectOverview} />
       <Route path="/project/:id/keys" component={ApiKeys} />
       <Route path="/project/:id/settings" component={Settings} />
+      <Route path="/project/:id/settings/general" component={ProjectSettingsGeneral} />
       <Route path="/project/:id/playground" component={Playground} />
       <Route path="/project/:id/docs" component={Documentation} />
       <Route path="/project/:id/usage" component={Usage} />

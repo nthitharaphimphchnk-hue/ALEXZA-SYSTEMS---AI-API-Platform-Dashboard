@@ -99,17 +99,22 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
     { enabled: !!projectId }
   );
 
-  const menuItems = [
+  const mainItems = [
     { icon: LayoutDashboard, label: t("nav.overview"), path: `/project/${projectId}` },
     { icon: Key, label: t("nav.apiKeys"), path: `/project/${projectId}/keys` },
     { icon: Play, label: t("nav.playground"), path: `/project/${projectId}/playground` },
     { icon: BookOpen, label: t("nav.documentation"), path: `/project/${projectId}/docs` },
     { icon: Activity, label: t("nav.usage"), path: `/project/${projectId}/usage` },
     { icon: CreditCard, label: t("nav.billing"), path: `/project/${projectId}/billing` },
-    { icon: Settings, label: t("nav.settings"), path: `/project/${projectId}/settings` },
   ];
 
-  const activeMenuItem = menuItems.find((item) => location === item.path);
+  const settingsItems = [
+    { icon: Settings, label: "General", path: `/project/${projectId}/settings/general` },
+  ];
+
+  const activeMenuItem = [...mainItems, ...settingsItems].find(
+    (item) => location === item.path
+  );
 
   useEffect(() => {
     if (isCollapsed) {
@@ -165,8 +170,28 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
 
           <SidebarContent className="gap-0 py-2">
             <SidebarMenu className="px-2">
-              {/* Menu Items */}
-              {menuItems.map((item) => {
+              {mainItems.map((item) => {
+                const isActive = location === item.path;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      onClick={() => setLocation(item.path)}
+                      tooltip={item.label}
+                      className="h-10 transition-all font-normal"
+                    >
+                      <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+            <div className="px-4 pt-4 pb-2 text-xs uppercase tracking-wider text-muted-foreground">
+              Project Settings
+            </div>
+            <SidebarMenu className="px-2">
+              {settingsItems.map((item) => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
