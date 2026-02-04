@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { isMockMode } from "@/_core/mock/mockMode";
+import { useTrpcQueryOrMock } from "@/_core/data/useTrpcQueryOrMock";
 import { Activity, Clock, TrendingUp, CreditCard } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -47,6 +48,12 @@ export default function Usage() {
     { enabled: !!projectId }
   );
 
+  const { data: recentRows, isLoading: recentLoading } = useTrpcQueryOrMock(
+    "usage.recent",
+    { projectId: projectId!, limit: 20 },
+    { enabled: !!projectId }
+  );
+
   const chartData = hourlyData?.map((item) => ({
     hour: new Date(item.hour).toLocaleTimeString("en-US", {
       hour: "2-digit",
@@ -64,29 +71,17 @@ export default function Usage() {
   };
 
   const recentActivity: ActivityRow[] = useMemo(() => {
-    if (!isMockMode()) return [];
-
-    // Best-effort: read mock events if present; otherwise generate stable-looking rows.
-    try {
-      const raw = localStorage.getItem("alexza_mock_usage_events");
-      if (raw) {
-        const parsed = JSON.parse(raw) as any[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const filtered = parsed
-            .filter((e) => !projectId || e.projectId === projectId)
-            .map((e) => ({
-              timestamp: String(e.timestamp),
-              endpoint: String(e.endpoint),
-              status: Number(e.status),
-              responseTimeMs: Number(e.responseTimeMs),
-              credits: Number(e.credits ?? 1),
-            })) as ActivityRow[];
-          if (filtered.length > 0) return filtered.slice(0, 12);
-        }
-      }
-    } catch {
-      // ignore
+    if (recentRows && Array.isArray(recentRows)) {
+      return recentRows.map((row: any) => ({
+        timestamp: String(row.timestamp),
+        endpoint: String(row.endpoint),
+        status: Number(row.statusCode ?? row.status),
+        responseTimeMs: Number(row.responseTimeMs ?? 0),
+        credits: Number(row.credits ?? 1),
+      }));
     }
+
+    if (!isMockMode()) return [];
 
     const now = Date.now();
     return Array.from({ length: 10 }).map((_, i) => ({
@@ -96,7 +91,7 @@ export default function Usage() {
       responseTimeMs: 90 + (i * 17) % 120,
       credits: 1,
     }));
-  }, [projectId, timeRange]);
+  }, [recentRows, projectId, timeRange]);
 
   return (
     <ProjectDashboardLayout>
@@ -272,7 +267,9 @@ export default function Usage() {
               <CardDescription>Latest requests and status</CardDescription>
             </CardHeader>
             <CardContent>
-              {isMockMode() ? (
+              {recentLoading ? (
+                <Skeleton className="h-[300px] w-full" />
+              ) : recentActivity.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>

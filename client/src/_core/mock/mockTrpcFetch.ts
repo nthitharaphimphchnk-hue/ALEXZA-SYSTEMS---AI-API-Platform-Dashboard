@@ -475,6 +475,20 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
       const hours = Number(inputJson?.hours ?? 24);
       return mockUsageByHour(projectId, Number.isFinite(hours) ? hours : 24);
     }
+    case "usage.recent": {
+      const projectId = Number(inputJson?.projectId ?? 1) || 1;
+      const limit = Number(inputJson?.limit ?? 20);
+      const events = getState().usageEvents
+        .filter((e) => e.projectId === projectId)
+        .slice(0, Number.isFinite(limit) ? limit : 20);
+      return events.map((e) => ({
+        timestamp: e.timestamp,
+        endpoint: e.endpoint,
+        statusCode: e.status,
+        responseTimeMs: e.responseTimeMs,
+        credits: e.credits,
+      }));
+    }
 
     // billing
     case "billing.current": {

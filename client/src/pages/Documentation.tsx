@@ -309,7 +309,7 @@ export default function Documentation() {
                         id="python-example"
                         code={`import requests
 
-response = requests.post(
+res = requests.post(
     "${baseUrl}/tti/decide-font",
     headers={
         "Authorization": "Bearer tti_your_api_key_here",
@@ -320,7 +320,7 @@ response = requests.post(
     }
 )
 
-data = response.json()
+data = res.json()
 print(data)`}
                       />
                     </TabsContent>

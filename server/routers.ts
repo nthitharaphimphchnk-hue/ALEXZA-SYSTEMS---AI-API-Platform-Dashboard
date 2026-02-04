@@ -4,6 +4,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
+import * as usageLogService from "./db/usageLogService";
+import { logUsage as logUsageToMongo } from "./services/usageLogService";
 import * as billingCalculator from "./billingCalculator";
 import { TRPCError } from "@trpc/server";
 
@@ -131,7 +133,7 @@ export const appRouter = router({
         if (!project) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
         }
-        return db.getUsageStats(input.projectId, input.hours);
+        return usageLogService.getUsageStats(input.projectId, input.hours);
       }),
 
     byHour: protectedProcedure
@@ -141,7 +143,17 @@ export const appRouter = router({
         if (!project) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
         }
-        return db.getUsageByHour(input.projectId, input.hours);
+        return usageLogService.getUsageByHour(input.projectId, input.hours);
+      }),
+
+    recent: protectedProcedure
+      .input(z.object({ projectId: z.number(), limit: z.number().default(20) }))
+      .query(async ({ ctx, input }) => {
+        const project = await db.getProjectById(input.projectId, ctx.user.id);
+        if (!project) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+        }
+        return usageLogService.getRecentUsageLogs(input.projectId, input.limit);
       }),
   }),
 
@@ -275,9 +287,10 @@ export const appRouter = router({
 
           if (res.status === 429) {
             const errMsg = "Rate limit exceeded. Please try again later.";
-            await db.logUsage({
+            await logUsageToMongo({
               projectId: input.projectId,
               apiKeyId: input.apiKeyId ?? null,
+              success: false,
               endpoint: "/api/tti/analyze",
               method: "POST",
               statusCode: 429,
@@ -303,9 +316,10 @@ export const appRouter = router({
               const text = await res.text();
               if (text) message = text.slice(0, 500);
             }
-            await db.logUsage({
+            await logUsageToMongo({
               projectId: input.projectId,
               apiKeyId: input.apiKeyId ?? null,
+              success: false,
               endpoint: "/api/tti/analyze",
               method: "POST",
               statusCode: 400,
@@ -328,9 +342,10 @@ export const appRouter = router({
               const text = await res.text();
               if (text) message = text.slice(0, 500);
             }
-            await db.logUsage({
+            await logUsageToMongo({
               projectId: input.projectId,
               apiKeyId: input.apiKeyId ?? null,
+              success: false,
               endpoint: "/api/tti/analyze",
               method: "POST",
               statusCode: res.status,
@@ -346,9 +361,10 @@ export const appRouter = router({
           const raw = (await res.json()) as unknown;
           const normalized = normalizeTtiResponse(input.text, raw, responseTime);
 
-          await db.logUsage({
+          await logUsageToMongo({
             projectId: input.projectId,
             apiKeyId: input.apiKeyId ?? null,
+            success: true,
             endpoint: "/api/tti/analyze",
             method: "POST",
             statusCode: 200,
@@ -368,9 +384,10 @@ export const appRouter = router({
           const message = isTimeout
             ? "Request timed out. Please try again."
             : err instanceof Error ? err.message : "Network error.";
-          await db.logUsage({
+          await logUsageToMongo({
             projectId: input.projectId,
             apiKeyId: input.apiKeyId ?? null,
+            success: false,
             endpoint: "/api/tti/analyze",
             method: "POST",
             statusCode: isTimeout ? 408 : 500,

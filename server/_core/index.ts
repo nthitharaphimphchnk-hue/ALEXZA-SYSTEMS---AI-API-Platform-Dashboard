@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { getMongoClient } from "../db/mongo";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -27,12 +28,45 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+async function initMongo(): Promise<void> {
+  if (!process.env.MONGODB_URI) {
+    console.error(
+      "[Mongo] MONGODB_URI is missing. Add it to .env to enable Mongo-backed features (usage logs, analytics)."
+    );
+    return;
+  }
+
+  try {
+    await getMongoClient();
+  } catch (error) {
+    console.error(
+      "[Mongo] Connection failed. Check MONGODB_URI, network access, and Atlas IP allowlist.",
+      error
+    );
+  }
+}
+
+function logOAuthEnvStatus(): void {
+  if (!process.env.OAUTH_SERVER_URL) {
+    console.warn(
+      "[OAuth] OAUTH_SERVER_URL is not configured. OAuth sign-in will be disabled."
+    );
+  }
+  if (!process.env.VITE_OAUTH_PORTAL_URL) {
+    console.warn(
+      "[OAuth] VITE_OAUTH_PORTAL_URL is not configured. Frontend sign-in will be disabled."
+    );
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  await initMongo();
+  logOAuthEnvStatus();
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
