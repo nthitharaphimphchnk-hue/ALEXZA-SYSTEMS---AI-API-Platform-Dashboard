@@ -46,8 +46,7 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user, status: authStatus } = useAuth();
-  const loginUrl = getLoginUrl();
+  const { loading, user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -63,29 +62,21 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <h1 className="text-2xl font-semibold tracking-tight text-center">
-              {authStatus === "disabled" ? "Auth disabled" : "Sign in to continue"}
+              Sign in to continue
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              {authStatus === "disabled"
-                ? "Set VITE_OAUTH_PORTAL_URL and OAUTH_SERVER_URL to enable sign-in."
-                : "Access to this dashboard requires authentication. Continue to launch the login flow."}
+              Access to this dashboard requires authentication. Continue to launch the login flow.
             </p>
           </div>
-          {loginUrl ? (
-            <Button
-              onClick={() => {
-                window.location.href = loginUrl;
-              }}
-              size="lg"
-              className="w-full shadow-lg hover:shadow-xl transition-all"
-            >
-              Sign in
-            </Button>
-          ) : (
-            <Button size="lg" className="w-full" disabled>
-              Sign in (not configured)
-            </Button>
-          )}
+          <Button
+            onClick={() => {
+              window.location.href = getLoginUrl();
+            }}
+            size="lg"
+            className="w-full shadow-lg hover:shadow-xl transition-all"
+          >
+            Sign in
+          </Button>
         </div>
       </div>
     );

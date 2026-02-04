@@ -1,15 +1,10 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import * as billingService from "./services/billingService";
-import * as planService from "./services/planService";
-import * as usageAnalyticsService from "./services/usageAnalyticsService";
-import * as adminAnalyticsService from "./services/adminAnalyticsService";
-import { getBillingMonth } from "./services/usageLogService";
-import { checkRateLimit } from "./_core/rateLimit";
+import * as billingCalculator from "./billingCalculator";
 import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
@@ -148,41 +143,6 @@ export const appRouter = router({
         }
         return db.getUsageByHour(input.projectId, input.hours);
       }),
-
-    /** Daily usage by date in a billing month (for Usage Dashboard chart). */
-    getDailyStats: protectedProcedure
-      .input(z.object({
-        projectId: z.number(),
-        billingMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-      }))
-      .query(async ({ ctx, input }) => {
-        const project = await db.getProjectById(input.projectId, ctx.user.id);
-        if (!project) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-        }
-        const billingMonth = input.billingMonth ?? getBillingMonth(new Date());
-        return usageAnalyticsService.getDailyUsage({
-          projectId: input.projectId,
-          billingMonth,
-        });
-      }),
-
-    /** Hourly usage for a single date (for Usage Dashboard). date = YYYY-MM-DD. */
-    getHourlyStats: protectedProcedure
-      .input(z.object({
-        projectId: z.number(),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      }))
-      .query(async ({ ctx, input }) => {
-        const project = await db.getProjectById(input.projectId, ctx.user.id);
-        if (!project) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-        }
-        return usageAnalyticsService.getHourlyUsage({
-          projectId: input.projectId,
-          date: input.date,
-        });
-      }),
   }),
 
   // Billing
@@ -207,158 +167,67 @@ export const appRouter = router({
         return db.getBillingHistory(input.projectId, input.limit);
       }),
 
-    /** Usage from MongoDB usageLogs (billing preview only; no real charges). Optional billingMonth YYYY-MM, default current month. */
     getUsageSummary: protectedProcedure
-      .input(z.object({
-        projectId: z.number(),
-        billingMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-      }))
+      .input(z.object({ projectId: z.number() }))
       .query(async ({ ctx, input }) => {
         const project = await db.getProjectById(input.projectId, ctx.user.id);
         if (!project) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
         }
-        const billingMonth = input.billingMonth ?? getBillingMonth(new Date());
-        const summary = await billingService.getMonthlyUsage({
-          projectId: input.projectId,
-          billingMonth,
-        });
-        const [y, mo] = billingMonth.split("-").map(Number);
-        const periodStart = new Date(Date.UTC(y, mo - 1, 1));
-        const periodEnd = new Date(Date.UTC(y, mo, 0, 23, 59, 59, 999));
+        const summary = await billingCalculator.getProjectUsageSummary(input.projectId);
+        if (!summary) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Billing summary unavailable" });
+        }
         return {
-          usedCredits: summary.creditsUsed,
-          requestCount: summary.requestCount,
-          successCount: summary.successCount,
-          errorCount: summary.errorCount,
-          quota: 1000,
-          billingMonth: summary.billingMonth,
-          periodStart: periodStart.toISOString(),
-          periodEnd: periodEnd.toISOString(),
-          planName: "free",
+          creditsUsed: summary.creditsUsed,
+          periodStart: summary.periodStart.toISOString(),
+          periodEnd: summary.periodEnd.toISOString(),
+          quota: summary.quota,
+          planName: summary.planName,
         };
       }),
 
-    /** Quota status for UI: usedCredits, quota, percentUsed, status (normal | nearing_limit | over_quota). Billing preview only; soft limit. */
     getQuotaStatus: protectedProcedure
-      .input(z.object({
-        projectId: z.number(),
-        billingMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-      }))
+      .input(z.object({ projectId: z.number() }))
       .query(async ({ ctx, input }) => {
         const project = await db.getProjectById(input.projectId, ctx.user.id);
         if (!project) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
         }
-        const status = await billingService.getQuotaStatus({
-          projectId: input.projectId,
-          billingMonth: input.billingMonth,
-          planId: project.planId ?? "free",
-        });
+        const status = await billingCalculator.getQuotaStatus(input.projectId);
         if (!status) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Quota status unavailable" });
         }
         return {
-          usedCredits: status.usedCredits,
-          quota: status.quota,
-          percentUsed: status.percentUsed,
           status: status.status,
-          billingMonth: status.billingMonth,
+          creditsUsed: status.creditsUsed,
+          quota: status.quota,
           periodStart: status.periodStart.toISOString(),
           periodEnd: status.periodEnd.toISOString(),
+          planName: status.planName,
         };
       }),
 
-    /** Billing preview: usage + quota + creditsRemaining. No real charges; for display only. */
     getBillingPreview: protectedProcedure
-      .input(z.object({
-        projectId: z.number(),
-        billingMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-      }))
+      .input(z.object({ projectId: z.number() }))
       .query(async ({ ctx, input }) => {
         const project = await db.getProjectById(input.projectId, ctx.user.id);
         if (!project) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
         }
-        const status = await billingService.getQuotaStatus({
-          projectId: input.projectId,
-          billingMonth: input.billingMonth,
-          planId: project.planId ?? "free",
-        });
-        if (!status) {
+        const preview = await billingCalculator.getBillingPreview(input.projectId);
+        if (!preview) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Billing preview unavailable" });
         }
-        const creditsRemaining = Math.max(0, status.quota - status.usedCredits);
-        const plan = await planService.getPlanById(project.planId ?? "free");
         return {
-          creditsUsed: status.usedCredits,
-          creditsRemaining,
-          quota: status.quota,
-          status: status.status,
-          percentUsed: status.percentUsed,
-          billingMonth: status.billingMonth,
-          periodStart: status.periodStart.toISOString(),
-          periodEnd: status.periodEnd.toISOString(),
-          planName: plan?.name?.toLowerCase() ?? "free",
-          planId: project.planId ?? "free",
+          creditsUsed: preview.creditsUsed,
+          creditsRemaining: preview.creditsRemaining,
+          quota: preview.quota,
+          status: preview.status,
+          periodStart: preview.periodStart.toISOString(),
+          periodEnd: preview.periodEnd.toISOString(),
+          planName: preview.planName,
         };
-      }),
-
-    /** List plans (Free / Pro / Enterprise). UX only; no Stripe / payment. */
-    listPlans: protectedProcedure.query(async () => {
-      return planService.listPlans();
-    }),
-
-    /** Change project plan. UX only; no real charge. */
-    changePlan: protectedProcedure
-      .input(z.object({ projectId: z.number(), planId: z.string() }))
-      .mutation(async ({ ctx, input }) => {
-        const project = await db.getProjectById(input.projectId, ctx.user.id);
-        if (!project) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-        }
-        const result = await planService.changeProjectPlan({
-          projectId: input.projectId,
-          planId: input.planId,
-          userId: ctx.user.id,
-        });
-        if (!result.ok) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: result.message ?? "Failed to change plan" });
-        }
-        return { success: true };
-      }),
-  }),
-
-  // Admin / Internal (role = admin only; for debug)
-  admin: router({
-    getAllProjectsUsage: adminProcedure
-      .input(z.object({
-        billingMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-        limit: z.number().min(1).max(1000).optional(),
-      }).optional())
-      .query(async ({ input }) => {
-        return adminAnalyticsService.getAllProjectsUsage({
-          billingMonth: input?.billingMonth,
-          limit: input?.limit,
-        });
-      }),
-
-    getTopProjectsByUsage: adminProcedure
-      .input(z.object({
-        billingMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-        limit: z.number().min(1).max(100).optional(),
-      }).optional())
-      .query(async ({ input }) => {
-        return adminAnalyticsService.getTopProjectsByUsage({
-          billingMonth: input?.billingMonth,
-          limit: input?.limit,
-        });
-      }),
-
-    getRecentErrors: adminProcedure
-      .input(z.object({ limit: z.number().min(1).max(500).optional() }).optional())
-      .query(async ({ input }) => {
-        return adminAnalyticsService.getRecentErrors({ limit: input?.limit });
       }),
   }),
 
@@ -374,24 +243,6 @@ export const appRouter = router({
         const project = await db.getProjectById(input.projectId, ctx.user.id);
         if (!project) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-        }
-
-        const rateLimitKey = input.apiKeyId ?? input.projectId;
-        if (!checkRateLimit(rateLimitKey)) {
-          const errMsg = "Rate limit exceeded. Try again later (60 requests per minute per API key).";
-          await db.logUsage({
-            projectId: input.projectId,
-            apiKeyId: input.apiKeyId ?? null,
-            endpoint: "/api/tti/analyze",
-            method: "POST",
-            statusCode: 429,
-            responseTimeMs: 0,
-            inputTokens: input.text.length,
-            outputTokens: 0,
-            cost: 0,
-            errorMessage: errMsg,
-          });
-          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: errMsg });
         }
 
         const TTI_API_URL = process.env.TTI_API_URL?.trim();

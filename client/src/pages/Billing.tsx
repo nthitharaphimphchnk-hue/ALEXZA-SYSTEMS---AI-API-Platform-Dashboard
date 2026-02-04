@@ -1,5 +1,4 @@
 import ProjectDashboardLayout from "@/components/ProjectDashboardLayout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,7 +6,6 @@ import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { AlertTriangle, Calendar, CreditCard, Receipt, Zap } from "lucide-react";
 import { useParams } from "wouter";
-import { toast } from "sonner";
 
 export default function Billing() {
   const params = useParams<{ id: string }>();
@@ -28,37 +26,19 @@ export default function Billing() {
     { enabled: !!projectId }
   );
 
-  const { data: plans, isLoading: plansLoading } = trpc.billing.listPlans.useQuery(undefined, {
-    enabled: true,
-  });
-
-  const utils = trpc.useUtils();
-  const changePlanMutation = trpc.billing.changePlan.useMutation({
-    onSuccess: () => {
-      utils.billing.getBillingPreview.invalidate({ projectId: projectId! });
-      utils.project.get.invalidate({ id: projectId! });
-      toast.success("Plan updated");
-    },
-    onError: (e) => {
-      toast.error(e.message || "Failed to change plan");
-    },
-  });
-
-  const currentPlanId = preview?.planId ?? "free";
-
   const usagePercentage =
-    preview?.percentUsed ?? (preview && preview.quota > 0
+    preview && preview.quota > 0
       ? Math.min((preview.creditsUsed / preview.quota) * 100, 100)
-      : 0);
+      : 0;
   const isNearingLimit = preview?.status === "nearing_limit";
   const isOverQuota = preview?.status === "over_quota";
 
   const quotaStatusLabel =
     preview?.status === "over_quota"
-      ? "ใช้เกิน (soft limit)"
+      ? "Over quota"
       : preview?.status === "nearing_limit"
-        ? "ใกล้หมด"
-        : "ปกติ";
+        ? "Nearing limit"
+        : "Normal";
 
   return (
     <ProjectDashboardLayout>
@@ -70,7 +50,7 @@ export default function Billing() {
           </p>
         </div>
 
-        {/* Credits & Quota – from MongoDB usageLogs (billing preview only; no real charges) */}
+        {/* Credits & Quota (source: usage_logs) */}
         <Card className="border-border/50">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -126,12 +106,12 @@ export default function Billing() {
                     />
                     <div>
                       <p className={`font-medium ${isOverQuota ? "text-destructive" : "text-chart-3"}`}>
-                        {isOverQuota ? "ใช้เกิน (soft limit)" : "ใกล้หมด"}
+                        {isOverQuota ? "Over quota" : "Nearing limit"}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {isOverQuota
-                          ? "ใช้เครดิตเกินโควตารายเดือนแล้ว ยังเรียก API ได้ (soft limit ไม่บล็อก)"
-                          : "กำลังใกล้ถึงโควตารายเดือน พิจารณาอัปเกรดแผน"}
+                          ? "Usage exceeds your monthly quota. Requests are still allowed (soft limit)."
+                          : "You are approaching your monthly credit limit. Consider upgrading your plan."}
                       </p>
                     </div>
                   </div>
@@ -157,111 +137,59 @@ export default function Billing() {
                       <CreditCard className="h-4 w-4 text-primary" />
                       <span className="text-sm text-muted-foreground">Quota status</span>
                     </div>
-                    <p className="text-2xl font-bold">{quotaStatusLabel}</p>
+                    <p className="text-2xl font-bold capitalize">{quotaStatusLabel}</p>
                   </div>
                 </div>
               </>
-            ) : !projectId ? (
-              <p className="text-muted-foreground">Select a project to view usage.</p>
             ) : (
               <p className="text-muted-foreground">No billing information available.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Plan selection (UX only; no real payment) */}
+        {/* Pricing Tiers (credit-based, no payment gateway yet) */}
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle className="text-lg">Plan / Package</CardTitle>
-            <CardDescription>
-              Credit-based quotas (1 API request = 1 credit). No charge yet — for display only.
-            </CardDescription>
+            <CardTitle className="text-lg">Plans</CardTitle>
+            <CardDescription>Credit-based quotas (1 API request = 1 credit)</CardDescription>
           </CardHeader>
           <CardContent>
-            {plansLoading ? (
-              <div className="grid gap-4 sm:grid-cols-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-48 w-full rounded-lg" />
-                ))}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="p-6 bg-secondary rounded-lg border border-border/50">
+                <h3 className="font-semibold mb-2">Free</h3>
+                <p className="text-3xl font-bold mb-4">1,000 credits/mo</p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>• 1,000 credits per month</li>
+                  <li>• Basic analytics</li>
+                  <li>• Soft limit when exceeded</li>
+                </ul>
               </div>
-            ) : plans && plans.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-3">
-                {plans.map((plan) => {
-                  const isCurrent = currentPlanId === plan._id;
-                  const isEnterprise = plan._id === "enterprise";
-                  const creditsLabel =
-                    plan.monthlyCredits === 0
-                      ? "Custom"
-                      : `${plan.monthlyCredits.toLocaleString()} credits/mo`;
-
-                  return (
-                    <div
-                      key={plan._id}
-                      className={`relative p-6 rounded-lg border ${
-                        isCurrent
-                          ? "bg-primary/10 border-primary/30"
-                          : "bg-secondary border-border/50"
-                      } ${plan._id === "pro" && !isCurrent ? "border-primary/20" : ""}`}
-                    >
-                      {plan._id === "pro" && (
-                        <span className="absolute -top-3 left-4 px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded">
-                          Popular
-                        </span>
-                      )}
-                      <h3 className="font-semibold mb-2">{plan.name}</h3>
-                      <p className="text-3xl font-bold mb-4">{creditsLabel}</p>
-                      <ul className="space-y-2 text-sm text-muted-foreground mb-4">
-                        {plan._id === "free" && (
-                          <>
-                            <li>• 1,000 credits per month</li>
-                            <li>• Basic analytics</li>
-                            <li>• Soft limit when exceeded</li>
-                          </>
-                        )}
-                        {plan._id === "pro" && (
-                          <>
-                            <li>• 50,000 credits/month</li>
-                            <li>• Advanced analytics</li>
-                            <li>• Priority support</li>
-                          </>
-                        )}
-                        {plan._id === "enterprise" && (
-                          <>
-                            <li>• Custom volume</li>
-                            <li>• Dedicated support</li>
-                            <li>• SLA guarantee</li>
-                          </>
-                        )}
-                      </ul>
-                      {isEnterprise ? (
-                        <Button variant="outline" className="w-full" disabled>
-                          Contact sales
-                        </Button>
-                      ) : isCurrent ? (
-                        <Button variant="secondary" className="w-full" disabled>
-                          Current plan
-                        </Button>
-                      ) : (
-                        <Button
-                          className="w-full"
-                          onClick={() =>
-                            changePlanMutation.mutate({
-                              projectId: projectId!,
-                              planId: plan._id,
-                            })
-                          }
-                          disabled={changePlanMutation.isPending}
-                        >
-                          {changePlanMutation.isPending ? "Updating…" : "Select"}
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="p-6 bg-primary/10 rounded-lg border border-primary/30 relative">
+                <span className="absolute -top-3 left-4 px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded">
+                  Popular
+                </span>
+                <h3 className="font-semibold mb-2">Pro</h3>
+                <p className="text-3xl font-bold mb-4">
+                  $29<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                </p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>• 50,000 requests/month</li>
+                  <li>• Advanced analytics</li>
+                  <li>• Priority support</li>
+                  <li>• Custom rules</li>
+                </ul>
               </div>
-            ) : (
-              <p className="text-muted-foreground">No plans available.</p>
-            )}
+              <div className="p-6 bg-secondary rounded-lg border border-border/50">
+                <h3 className="font-semibold mb-2">Enterprise</h3>
+                <p className="text-3xl font-bold mb-4">Custom</p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>• Unlimited requests</li>
+                  <li>• Dedicated support</li>
+                  <li>• SLA guarantee</li>
+                  <li>• Custom integration</li>
+                </ul>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

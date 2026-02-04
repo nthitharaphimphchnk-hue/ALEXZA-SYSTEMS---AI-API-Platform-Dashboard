@@ -1,4 +1,3 @@
-import { API_BASE_URL } from "@/_core/api";
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -17,10 +16,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (typeof window === "undefined") return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
+
   if (!isUnauthorized) return;
 
-  const loginUrl = getLoginUrl();
-  if (loginUrl) window.location.href = loginUrl;
+  window.location.href = getLoginUrl();
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -42,7 +41,7 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: `${API_BASE_URL}/api/trpc`,
+      url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {
@@ -53,17 +52,6 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
-
-// Umami analytics fully disabled to fix invalid URL (no code calls new URL from VITE_ANALYTICS_*)
-// const analyticsEndpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT;
-// const analyticsWebsiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
-// if (typeof analyticsEndpoint === "string" && analyticsEndpoint && typeof analyticsWebsiteId === "string" && analyticsWebsiteId) {
-//   const script = document.createElement("script");
-//   script.src = `${analyticsEndpoint}/umami`;
-//   script.dataset.websiteId = analyticsWebsiteId;
-//   script.defer = true;
-//   document.head.appendChild(script);
-// }
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>

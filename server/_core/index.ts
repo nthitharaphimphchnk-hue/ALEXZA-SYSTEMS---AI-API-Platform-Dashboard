@@ -7,10 +7,6 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { ensureUsageLogsIndexes } from "../services/usageLogService";
-import { ensureBillingPlans } from "../services/planService";
-import { ensureApiKeysIndexes } from "../services/apiKeyService";
-import { requestLogger } from "./requestLogger";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -37,18 +33,6 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  app.use(requestLogger);
-
-  // Health check (no auth, no API key) – for Render / load balancer
-  app.get("/health", (_req, res) => {
-    res.json({
-      status: "ok",
-      service: "ALEXZA API",
-      uptime: Math.floor(process.uptime()),
-      timestamp: new Date().toISOString(),
-    });
-  });
-
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
@@ -66,21 +50,12 @@ async function startServer() {
     serveStatic(app);
   }
 
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error("[ERROR]", err);
-    res.status(500).json({ error: "Internal server error" });
-  });
-
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
-
-  await ensureUsageLogsIndexes();
-  await ensureBillingPlans();
-  await ensureApiKeysIndexes();
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);

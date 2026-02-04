@@ -13,16 +13,12 @@ import Usage from "./pages/Usage";
 import Billing from "./pages/Billing";
 import QuickStart from "./pages/QuickStart";
 import Settings from "./pages/Settings";
-import AdminDashboard from "./pages/AdminDashboard";
 
 function Router() {
   return (
     <Switch>
       {/* Project Selector - Landing page */}
       <Route path="/" component={ProjectSelector} />
-
-      {/* Admin / Internal (role = admin only) */}
-      <Route path="/admin" component={AdminDashboard} />
       
       {/* Quick Start Guide */}
       <Route path="/quickstart" component={QuickStart} />

@@ -19,28 +19,13 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
-import { FolderPlus, Loader2, Plus, LayoutDashboard, Settings, LogOut, Shield } from "lucide-react";
+import { FolderPlus, Loader2, Plus, LayoutDashboard, Settings, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-/** Only used when auth is disabled (no session) so project.list API cannot be called. */
-const MOCK_PROJECTS = [
-  {
-    id: 1,
-    name: "TTI",
-    description: "Thai Typography Intelligence – mock dev project",
-    userId: 1,
-    environment: "development" as const,
-    status: "active" as const,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 export default function ProjectSelector() {
-  const { user, loading: authLoading, status: authStatus, logout } = useAuth();
-  const loginUrl = getLoginUrl();
+  const { user, loading: authLoading, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -54,19 +39,9 @@ export default function ProjectSelector() {
     environment: "development",
   });
 
-  const {
-    data: projects,
-    isLoading: projectsLoading,
-    isError: projectsError,
-    refetch: refetchProjects,
-  } = trpc.project.list.useQuery(undefined, {
-    enabled: !!user && authStatus !== "disabled",
+  const { data: projects, isLoading: projectsLoading } = trpc.project.list.useQuery(undefined, {
+    enabled: !!user,
   });
-
-  const isMockMode = authStatus === "disabled";
-  const displayProjects = isMockMode ? MOCK_PROJECTS : (projects ?? []);
-  const displayLoading = isMockMode ? false : projectsLoading;
-  const displayError = !isMockMode && projectsError;
 
   const createProject = trpc.project.create.useMutation({
     onSuccess: (project) => {
@@ -80,17 +55,6 @@ export default function ProjectSelector() {
     },
   });
 
-  const handleCreateSubmit = () => {
-    if (isMockMode) {
-      setIsCreateOpen(false);
-      setNewProject({ name: "", description: "", environment: "development" });
-      setLocation("/project/1");
-      toast.success("Mock mode: opened TTI project");
-      return;
-    }
-    createProject.mutate(newProject);
-  };
-
   const utils = trpc.useUtils();
 
   if (authLoading) {
@@ -101,7 +65,6 @@ export default function ProjectSelector() {
     );
   }
 
-  // Not signed in but auth is configured: show sign-in card (redirect would go to loginUrl).
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -121,19 +84,13 @@ export default function ProjectSelector() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loginUrl ? (
-              <Button
-                onClick={() => (window.location.href = loginUrl)}
-                className="w-full h-12 text-base"
-                size="lg"
-              >
-                Sign in to continue
-              </Button>
-            ) : (
-              <Button className="w-full h-12 text-base" size="lg" disabled>
-                Sign in (not configured)
-              </Button>
-            )}
+            <Button
+              onClick={() => (window.location.href = getLoginUrl())}
+              className="w-full h-12 text-base"
+              size="lg"
+            >
+              Sign in to continue
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -169,12 +126,6 @@ export default function ProjectSelector() {
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>{t("nav.dashboard")}</span>
                 </DropdownMenuItem>
-                {user.role === "admin" && (
-                  <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer">
-                    <Shield className="mr-2 h-4 w-4" />
-                    <span>Admin (Internal)</span>
-                  </DropdownMenuItem>
-                )}
                 <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>{t("nav.settings")}</span>
@@ -263,34 +214,23 @@ export default function ProjectSelector() {
                   {t("projects.cancel")}
                 </Button>
                 <Button
-                  onClick={handleCreateSubmit}
-                  disabled={!newProject.name.trim() || (!isMockMode && createProject.isPending)}
+                  onClick={() => createProject.mutate(newProject)}
+                  disabled={!newProject.name.trim() || createProject.isPending}
                 >
-                  {!isMockMode && createProject.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {createProject.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t("projects.create")}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          {displayLoading ? (
+          {projectsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : displayError ? (
-            <Card className="border-destructive/50">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-muted-foreground mb-4">
-                  Could not load projects. Please try again.
-                </p>
-                <Button variant="outline" onClick={() => refetchProjects()}>
-                  Retry
-                </Button>
-              </CardContent>
-            </Card>
-          ) : displayProjects.length > 0 ? (
+          ) : projects && projects.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {displayProjects.map((project) => (
+              {projects.map((project) => (
                 <Card
                   key={project.id}
                   className="group cursor-pointer border-border/50 hover:border-primary/50 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5"
