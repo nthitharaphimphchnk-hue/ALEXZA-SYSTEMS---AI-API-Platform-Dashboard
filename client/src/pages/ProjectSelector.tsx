@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getLoginUrl } from "@/const";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { trpc } from "@/lib/trpc";
@@ -25,7 +24,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 export default function ProjectSelector() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, login, status } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -41,6 +40,7 @@ export default function ProjectSelector() {
 
   const { data: projects, isLoading: projectsLoading } = trpc.project.list.useQuery(undefined, {
     enabled: !!user,
+    retry: false,
   });
 
   const createProject = trpc.project.create.useMutation({
@@ -80,16 +80,19 @@ export default function ProjectSelector() {
               </div>
             </div>
             <CardDescription className="text-base text-center">
-              Sign in to access your TTI API projects and developer dashboard.
+              {status === "disabled"
+                ? "Sign in is not configured for this environment."
+                : "Sign in to access your TTI API projects and developer dashboard."}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => (window.location.href = getLoginUrl())}
               className="w-full h-12 text-base"
               size="lg"
+              disabled={status === "disabled"}
+              onClick={login}
             >
-              Sign in to continue
+              {status === "disabled" ? "Sign in (not configured)" : "Sign in to continue"}
             </Button>
           </CardContent>
         </Card>

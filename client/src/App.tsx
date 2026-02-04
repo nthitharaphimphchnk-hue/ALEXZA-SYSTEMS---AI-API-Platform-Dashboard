@@ -17,7 +17,7 @@ import Settings from "./pages/Settings";
 function Router() {
   return (
     <Switch>
-      {/* Project Selector - Landing page */}
+      {/* Project Selector - Landing page (root route) */}
       <Route path="/" component={ProjectSelector} />
       
       {/* Quick Start Guide */}
@@ -35,9 +35,10 @@ function Router() {
       <Route path="/project/:id/usage" component={Usage} />
       <Route path="/project/:id/billing" component={Billing} />
       
-      {/* 404 */}
+      {/* 404 - explicit path */}
       <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
+      {/* Fallback: render landing page for unknown paths */}
+      <Route component={ProjectSelector} />
     </Switch>
   );
 }

@@ -170,6 +170,13 @@ export default defineConfig({
   },
   server: {
     host: true,
+    // When using pnpm dev:client only, proxy /api to backend (run pnpm dev in another terminal on port 3000)
+    proxy: {
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+    },
     allowedHosts: [
       ".manuspre.computer",
       ".manus.computer",
