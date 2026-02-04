@@ -518,6 +518,10 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
   }
 }
 
+export async function mockQuery(path: string, inputJson: unknown) {
+  return handleProcedure(path, inputJson);
+}
+
 /**
  * Intercepts frontend tRPC calls and returns mocked responses.
  * Return `null` if the request is not a tRPC request.

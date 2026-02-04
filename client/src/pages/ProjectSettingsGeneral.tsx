@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { trpc } from "@/lib/trpc";
+import { useTrpcQueryOrMock } from "@/_core/data/useTrpcQueryOrMock";
 import { Copy, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "wouter";
@@ -21,7 +21,8 @@ export default function ProjectSettingsGeneral() {
   const params = useParams<{ id: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
 
-  const { data: project, isLoading } = trpc.project.get.useQuery(
+  const { data: project, isLoading } = useTrpcQueryOrMock(
+    "project.get",
     { id: projectId! },
     { enabled: !!projectId }
   );
