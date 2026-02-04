@@ -2,11 +2,20 @@ import ProjectDashboardLayout from "@/components/ProjectDashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
-import { Activity, Clock, TrendingUp, Zap, BarChart3 } from "lucide-react";
+import { isMockMode } from "@/_core/mock/mockMode";
+import { Activity, Clock, TrendingUp, CreditCard } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "wouter";
 import {
   Area,
@@ -33,14 +42,61 @@ export default function Usage() {
     { enabled: !!projectId }
   );
 
+  const { data: preview } = trpc.billing.getBillingPreview.useQuery(
+    { projectId: projectId! },
+    { enabled: !!projectId }
+  );
+
   const chartData = hourlyData?.map((item) => ({
     hour: new Date(item.hour).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     }),
     requests: item.requests,
-    cost: (item.cost || 0) / 100,
   })) || [];
+
+  type ActivityRow = {
+    timestamp: string;
+    endpoint: string;
+    status: number;
+    responseTimeMs: number;
+    credits: number;
+  };
+
+  const recentActivity: ActivityRow[] = useMemo(() => {
+    if (!isMockMode()) return [];
+
+    // Best-effort: read mock events if present; otherwise generate stable-looking rows.
+    try {
+      const raw = localStorage.getItem("alexza_mock_usage_events");
+      if (raw) {
+        const parsed = JSON.parse(raw) as any[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const filtered = parsed
+            .filter((e) => !projectId || e.projectId === projectId)
+            .map((e) => ({
+              timestamp: String(e.timestamp),
+              endpoint: String(e.endpoint),
+              status: Number(e.status),
+              responseTimeMs: Number(e.responseTimeMs),
+              credits: Number(e.credits ?? 1),
+            })) as ActivityRow[];
+          if (filtered.length > 0) return filtered.slice(0, 12);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    const now = Date.now();
+    return Array.from({ length: 10 }).map((_, i) => ({
+      timestamp: new Date(now - i * 6 * 60_000).toISOString(),
+      endpoint: "POST /tti/decide-font",
+      status: i % 9 === 0 ? 429 : 200,
+      responseTimeMs: 90 + (i * 17) % 120,
+      credits: 1,
+    }));
+  }, [projectId, timeRange]);
 
   return (
     <ProjectDashboardLayout>
@@ -74,12 +130,12 @@ export default function Usage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Summary (answers: How much? Is it working? Close to limits?) */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Requests
+                Requests
               </CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -131,29 +187,32 @@ export default function Usage() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Cost
+                Credits used
               </CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {statsLoading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
-                <div className="text-2xl font-bold">
-                  ${((stats?.totalCost || 0) / 100).toFixed(2)}
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold">
+                    {preview ? `${preview.creditsUsed.toLocaleString()} / ${preview.quota.toLocaleString()}` : "—"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Credits are counted per request.</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts */}
+        {/* Usage over time + Recent activity */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Requests Chart */}
           <Card className="border-border/50">
             <CardHeader>
               <CardTitle className="text-lg">Request Volume</CardTitle>
-              <CardDescription>API requests over time</CardDescription>
+              <CardDescription>Requests over time</CardDescription>
             </CardHeader>
             <CardContent>
               {hourlyLoading ? (
@@ -200,116 +259,72 @@ export default function Usage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center">
-                  <EmptyState
-                    icon={BarChart3}
-                    title={t("empty.noData")}
-                    description={t("empty.noDataDesc")}
-                  />
+                  <EmptyState icon={Activity} title={t("empty.noData")} description={t("empty.noDataDesc")} />
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Cost Chart */}
+          {/* Recent activity */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Cost Over Time</CardTitle>
-              <CardDescription>API usage costs</CardDescription>
+              <CardTitle className="text-lg">Recent activity</CardTitle>
+              <CardDescription>Latest requests and status</CardDescription>
             </CardHeader>
             <CardContent>
-              {hourlyLoading ? (
-                <Skeleton className="h-[300px] w-full" />
-              ) : stats && stats.totalRequests > 0 && chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="oklch(0.7 0.15 160)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="oklch(0.7 0.15 160)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="hour"
-                      stroke="oklch(0.6 0 0)"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="oklch(0.6 0 0)"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `$${value}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "oklch(0.16 0 0)",
-                        border: "1px solid oklch(0.28 0 0)",
-                        borderRadius: "8px",
-                      }}
-                      labelStyle={{ color: "oklch(0.95 0 0)" }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, "Cost"]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="cost"
-                      stroke="oklch(0.7 0.15 160)"
-                      strokeWidth={2}
-                      fill="url(#costGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+              {isMockMode() ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Endpoint</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Latency</TableHead>
+                      <TableHead className="text-right">Credits</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentActivity.map((row) => (
+                      <TableRow key={`${row.timestamp}-${row.endpoint}`}>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(row.timestamp).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{row.endpoint}</TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-0.5 rounded text-xs ${
+                              row.status >= 200 && row.status < 400
+                                ? "bg-muted/50 text-foreground"
+                                : row.status === 429
+                                  ? "bg-chart-3/10 text-chart-3"
+                                  : "bg-destructive/10 text-destructive"
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {row.responseTimeMs}ms
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {row.credits}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : (
                 <div className="h-[300px] flex items-center justify-center">
                   <EmptyState
-                    icon={BarChart3}
-                    title={t("empty.noData")}
-                    description={t("empty.noDataDesc")}
+                    icon={Activity}
+                    title="Recent activity"
+                    description="Recent request logs will appear here."
                   />
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
-
-        {/* Performance Insights */}
-        <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg">Performance Insights</CardTitle>
-            <CardDescription>Key metrics and recommendations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="p-4 bg-secondary rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Peak Usage Time</p>
-                <p className="text-lg font-semibold">
-                  {chartData.length > 0
-                    ? chartData.reduce((max, item) =>
-                        item.requests > max.requests ? item : max
-                      ).hour
-                    : "N/A"}
-                </p>
-              </div>
-              <div className="p-4 bg-secondary rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Avg Requests/Hour</p>
-                <p className="text-lg font-semibold">
-                  {chartData.length > 0
-                    ? Math.round(
-                        chartData.reduce((sum, item) => sum + item.requests, 0) / chartData.length
-                      )
-                    : 0}
-                </p>
-              </div>
-              <div className="p-4 bg-secondary rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Cost/Request</p>
-                <p className="text-lg font-semibold">
-                  ${stats?.totalRequests ? ((stats.totalCost || 0) / stats.totalRequests / 100).toFixed(4) : "0.0000"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </ProjectDashboardLayout>
   );

@@ -1,6 +1,7 @@
 import ProjectDashboardLayout from "@/components/ProjectDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyCodeBlock } from "@/components/CopyCodeBlock";
 import {
   Dialog,
   DialogContent,
@@ -32,14 +33,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
-import { Check, Copy, Key, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Copy, Key, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 
 export default function ApiKeys() {
   const params = useParams<{ id: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
+  const [, setLocation] = useLocation();
+
+  const baseUrl =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
+    "https://api.alexza.systems";
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
@@ -191,7 +197,80 @@ export default function ApiKeys() {
             </DialogContent>
             </Dialog>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Requests made with this key will appear in{" "}
+            <button
+              className="underline underline-offset-4 hover:text-foreground transition-colors"
+              onClick={() => projectId && setLocation(`/project/${projectId}/usage`)}
+              type="button"
+            >
+              Usage
+            </button>
+            .
+          </p>
         </div>
+
+        {/* Keys-first Quickstart */}
+        <Card className="border-border/50 bg-card/50">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle className="text-lg">Quickstart</CardTitle>
+                <CardDescription>
+                  Create a key, copy the request, and make your first API call.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => projectId && setLocation(`/project/${projectId}/docs`)}
+                >
+                  View full documentation <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Step 1 — Authentication</p>
+                <CopyCodeBlock
+                  id="keys-auth-header"
+                  code={`Authorization: Bearer ${newKeyValue ?? "tti_your_api_key_here"}`}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Bearer key in the Authorization header.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Step 2 — Base URL</p>
+                <CopyCodeBlock id="keys-base-url" code={baseUrl} />
+                <p className="text-xs text-muted-foreground">Requests are counted per request (credits).</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Step 3 — First request</p>
+              <CopyCodeBlock
+                id="keys-first-request"
+                code={`curl -X POST "${baseUrl}/tti/decide-font" \\\n  -H "Authorization: Bearer ${newKeyValue ?? "tti_your_api_key_here"}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"text":"สวัสดีครับ"}'`}
+              />
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => projectId && setLocation(`/project/${projectId}/usage`)}
+                >
+                  View your usage <ArrowRight className="h-4 w-4" />
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  After you send requests, you’ll see them in Usage.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-border/50">
           <CardHeader>

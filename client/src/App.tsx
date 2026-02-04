@@ -25,6 +25,9 @@ function Router() {
       
       {/* Standalone Playground (no project required) */}
       <Route path="/playground" component={Playground} />
+
+      {/* Standalone Documentation (no project required) */}
+      <Route path="/documentation" component={Documentation} />
       
       {/* Project Dashboard Routes */}
       <Route path="/project/:id" component={ProjectOverview} />

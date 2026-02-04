@@ -1,55 +1,37 @@
 import ProjectDashboardLayout from "@/components/ProjectDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyCodeBlock } from "@/components/CopyCodeBlock";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, Copy, ExternalLink } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { ArrowRight } from "lucide-react";
+import { useLocation, useParams } from "wouter";
 
 export default function Documentation() {
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const params = useParams<{ id: string }>();
+  const projectId = params.id ? parseInt(params.id) : null;
+  const [, setLocation] = useLocation();
 
-  const handleCopyCode = async (code: string, id: string) => {
-    await navigator.clipboard.writeText(code);
-    setCopiedCode(id);
-    toast.success("Code copied to clipboard");
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
+  const baseUrl =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
+    "https://api.alexza.systems";
 
-  const CodeBlock = ({ code, language, id }: { code: string; language: string; id: string }) => (
-    <div className="relative group">
-      <pre className="p-4 bg-secondary rounded-lg overflow-x-auto text-sm font-mono">
-        <code>{code}</code>
-      </pre>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={() => handleCopyCode(code, id)}
-      >
-        {copiedCode === id ? (
-          <Check className="h-4 w-4 text-foreground" />
-        ) : (
-          <Copy className="h-4 w-4" />
-        )}
-      </Button>
-    </div>
-  );
+  const playgroundPath = projectId ? `/project/${projectId}/playground` : "/playground";
 
-  return (
-    <ProjectDashboardLayout>
-      <div className="space-y-6">
+  const body = (
+    <div className="space-y-6">
         {/* Hero Section with Branding */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <img src="/alexza-logo-full.png" alt="ALEXZA SYSTEMS" className="h-10 w-auto" />
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">API Documentation</h1>
-              <p className="text-sm text-muted-foreground">ALEXZA SYSTEMS Developer Platform</p>
+              <p className="text-sm text-muted-foreground">
+                Reference and examples for using ALEXZA APIs
+              </p>
             </div>
           </div>
           <p className="text-muted-foreground">
-            Complete API reference and integration guides for the TTI API.
+            Copy-first docs that stay close to real usage.
           </p>
         </div>
 
@@ -61,13 +43,10 @@ export default function Documentation() {
             </CardHeader>
             <CardContent className="space-y-1">
               {[
-                { label: "Getting Started", href: "#getting-started" },
-                { label: "Authentication", href: "#authentication" },
+                { label: "Quickstart", href: "#quickstart" },
                 { label: "Endpoints", href: "#endpoints" },
-                { label: "Request Format", href: "#request-format" },
-                { label: "Response Format", href: "#response-format" },
-                { label: "Error Codes", href: "#error-codes" },
-                { label: "Code Examples", href: "#code-examples" },
+                { label: "Errors", href: "#errors" },
+                { label: "Examples", href: "#examples" },
               ].map((item) => (
                 <a
                   key={item.href}
@@ -83,26 +62,48 @@ export default function Documentation() {
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-8">
             {/* Getting Started */}
-            <section id="getting-started">
+            <section id="quickstart">
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>Getting Started</CardTitle>
+                  <CardTitle>Quickstart</CardTitle>
                   <CardDescription>
-                    Quick start guide to integrate the TTI API into your application.
+                    Authentication, base URL, and your first request.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="prose prose-invert max-w-none">
-                  <p className="text-muted-foreground">
-                    The TTI (Thai Typography Intelligence) API provides advanced text analysis and
-                    typography optimization for Thai language content. Follow these steps to get
-                    started:
+                <CardContent className="space-y-6">
+                  <p className="text-sm text-muted-foreground">
+                    Reference and examples for using ALEXZA APIs. Start with one key and one request.
                   </p>
-                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground mt-4">
-                    <li>Create a project in the dashboard</li>
-                    <li>Generate an API key from the API Keys page</li>
-                    <li>Make your first API request using the examples below</li>
-                    <li>Test your integration in the Playground</li>
-                  </ol>
+
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">Authentication (Bearer API key)</p>
+                    <CopyCodeBlock
+                      id="qs-auth"
+                      code={`Authorization: Bearer tti_your_api_key_here`}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">Base URL</p>
+                    <CopyCodeBlock id="qs-base-url" code={baseUrl} />
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">First request</p>
+                    <CopyCodeBlock
+                      id="qs-first-request"
+                      code={`curl -X POST "${baseUrl}/tti/decide-font" \\\n  -H "Authorization: Bearer tti_your_api_key_here" \\\n  -H "Content-Type: application/json" \\\n  -d '{"text":"สวัสดีครับ"}'`}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => setLocation(playgroundPath)}
+                      >
+                        Try in Playground <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </section>
@@ -120,9 +121,9 @@ export default function Documentation() {
                   <p className="text-muted-foreground">
                     All API requests must include your API key in the Authorization header:
                   </p>
-                  <CodeBlock
+                  <CopyCodeBlock
                     id="auth-header"
-                    language="http"
+                    label="Header"
                     code={`Authorization: Bearer tti_your_api_key_here`}
                   />
                   <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -139,32 +140,41 @@ export default function Documentation() {
             <section id="endpoints">
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>API Endpoints</CardTitle>
-                  <CardDescription>Available endpoints and their purposes.</CardDescription>
+                  <CardTitle>Endpoints reference</CardTitle>
+                  <CardDescription>Cards you can copy from.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="p-4 bg-secondary rounded-lg">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-3">
                         <span className="px-2 py-1 bg-muted/50 text-foreground text-xs font-medium rounded">
                           POST
                         </span>
-                        <code className="text-sm font-mono">/api/v1/analyze</code>
+                        <code className="text-sm font-mono">/tti/decide-font</code>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => setLocation(playgroundPath)}
+                        >
+                          Try this endpoint in Playground <ArrowRight className="h-4 w-4" />
+                        </Button>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Analyze Thai text through the full TTI pipeline including AI intent
-                        translation, rule engine processing, and typography scoring.
+                        Decide typography settings for Thai text. Use this as your first request.
                       </p>
                     </div>
                     <div className="p-4 bg-secondary rounded-lg">
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
-                          GET
+                        <span className="px-2 py-1 bg-muted/30 text-muted-foreground text-xs font-medium rounded">
+                          SOON
                         </span>
-                        <code className="text-sm font-mono">/api/v1/health</code>
+                        <code className="text-sm font-mono">/…</code>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Check the API service health and availability status.
+                        More endpoints will appear here as ALEXZA expands the API surface.
                       </p>
                     </div>
                   </div>
@@ -181,18 +191,12 @@ export default function Documentation() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-muted-foreground">
-                    Send a POST request with JSON body to the analyze endpoint:
+                    Send a POST request with JSON body to <span className="font-mono">/tti/decide-font</span>:
                   </p>
-                  <CodeBlock
+                  <CopyCodeBlock
                     id="request-format"
-                    language="json"
-                    code={`{
-  "text": "ข้อความภาษาไทยที่ต้องการวิเคราะห์",
-  "options": {
-    "include_entities": true,
-    "include_suggestions": true
-  }
-}`}
+                    label="JSON"
+                    code={`{\n  "text": "ข้อความภาษาไทย"\n}`}
                   />
                   <div className="space-y-2">
                     <h4 className="font-medium">Parameters</h4>
@@ -208,12 +212,7 @@ export default function Documentation() {
                         <tr className="border-b border-border/50">
                           <td className="py-2 font-mono">text</td>
                           <td className="py-2">string</td>
-                          <td className="py-2">Required. The Thai text to analyze (max 10,000 chars)</td>
-                        </tr>
-                        <tr className="border-b border-border/50">
-                          <td className="py-2 font-mono">options</td>
-                          <td className="py-2">object</td>
-                          <td className="py-2">Optional. Configuration options</td>
+                          <td className="py-2">Required. The Thai text to process</td>
                         </tr>
                       </tbody>
                     </table>
@@ -230,44 +229,20 @@ export default function Documentation() {
                   <CardDescription>Structure of API response payloads.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <CodeBlock
+                  <CopyCodeBlock
                     id="response-format"
-                    language="json"
-                    code={`{
-  "success": true,
-  "data": {
-    "ai_translation": {
-      "detected_language": "th",
-      "intent": "typography_analysis",
-      "confidence": 0.95,
-      "entities": [...]
-    },
-    "rule_engine": {
-      "rules_applied": [...],
-      "suggestions": [...]
-    },
-    "result": {
-      "processed_text": "...",
-      "typography_score": 95,
-      "character_count": 42,
-      "word_count": 8
-    }
-  },
-  "metadata": {
-    "response_time_ms": 150,
-    "api_version": "1.0.0"
-  }
-}`}
+                    label="JSON"
+                    code={`{\n  "font": "Inter",\n  "score": 0.92,\n  "reason": "…"\n}`}
                   />
                 </CardContent>
               </Card>
             </section>
 
             {/* Error Codes */}
-            <section id="error-codes">
+            <section id="errors">
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>Error Codes</CardTitle>
+                  <CardTitle>Errors & status codes</CardTitle>
                   <CardDescription>Common error responses and their meanings.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -280,11 +255,6 @@ export default function Documentation() {
                       </tr>
                     </thead>
                     <tbody className="text-muted-foreground">
-                      <tr className="border-b border-border/50">
-                        <td className="py-2 font-mono">400</td>
-                        <td className="py-2">Bad Request</td>
-                        <td className="py-2">Invalid request format or missing required fields</td>
-                      </tr>
                       <tr className="border-b border-border/50">
                         <td className="py-2 font-mono">401</td>
                         <td className="py-2">Unauthorized</td>
@@ -312,10 +282,10 @@ export default function Documentation() {
             </section>
 
             {/* Code Examples */}
-            <section id="code-examples">
+            <section id="examples">
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>Code Examples</CardTitle>
+                  <CardTitle>Examples</CardTitle>
                   <CardDescription>
                     Integration examples in popular programming languages.
                   </CardDescription>
@@ -329,64 +299,43 @@ export default function Documentation() {
                       <TabsTrigger value="go">Go</TabsTrigger>
                     </TabsList>
                     <TabsContent value="curl" className="mt-4">
-                      <CodeBlock
+                      <CopyCodeBlock
                         id="curl-example"
-                        language="bash"
-                        code={`curl -X POST https://api.alexza.systems/v1/analyze \\
-  -H "Authorization: Bearer tti_your_api_key" \\
+                        code={`curl -X POST "${baseUrl}/tti/decide-font" \\
+  -H "Authorization: Bearer tti_your_api_key_here" \\
   -H "Content-Type: application/json" \\
-  -d '{
-    "text": "สวัสดีครับ ยินดีต้อนรับ"
-  }'`}
+  -d '{"text":"สวัสดีครับ"}'`}
                       />
                     </TabsContent>
                     <TabsContent value="python" className="mt-4">
-                      <CodeBlock
+                      <CopyCodeBlock
                         id="python-example"
-                        language="python"
                         code={`import requests
 
 response = requests.post(
-    "https://api.alexza.systems/v1/analyze",
+    "${baseUrl}/tti/decide-font",
     headers={
-        "Authorization": "Bearer tti_your_api_key",
+        "Authorization": "Bearer tti_your_api_key_here",
         "Content-Type": "application/json"
     },
     json={
-        "text": "สวัสดีครับ ยินดีต้อนรับ"
+        "text": "สวัสดีครับ"
     }
 )
 
 data = response.json()
-print(data["data"]["result"]["typography_score"])`}
+print(data)`}
                       />
                     </TabsContent>
                     <TabsContent value="javascript" className="mt-4">
-                      <CodeBlock
+                      <CopyCodeBlock
                         id="js-example"
-                        language="javascript"
-                        code={`const response = await fetch(
-  "https://api.alexza.systems/v1/analyze",
-  {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer tti_your_api_key",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      text: "สวัสดีครับ ยินดีต้อนรับ"
-    })
-  }
-);
-
-const data = await response.json();
-console.log(data.data.result.typography_score);`}
+                        code={`const res = await fetch("${baseUrl}/tti/decide-font", {\n  method: "POST",\n  headers: {\n    Authorization: "Bearer tti_your_api_key_here",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({ text: "สวัสดีครับ" }),\n});\n\nconst data = await res.json();\nconsole.log(data);`}
                       />
                     </TabsContent>
                     <TabsContent value="go" className="mt-4">
-                      <CodeBlock
+                      <CopyCodeBlock
                         id="go-example"
-                        language="go"
                         code={`package main
 
 import (
@@ -397,16 +346,16 @@ import (
 
 func main() {
     payload := map[string]string{
-        "text": "สวัสดีครับ ยินดีต้อนรับ",
+        "text": "สวัสดีครับ",
     }
     body, _ := json.Marshal(payload)
     
     req, _ := http.NewRequest(
         "POST",
-        "https://api.alexza.systems/v1/analyze",
+        "${baseUrl}/tti/decide-font",
         bytes.NewBuffer(body),
     )
-    req.Header.Set("Authorization", "Bearer tti_your_api_key")
+    req.Header.Set("Authorization", "Bearer tti_your_api_key_here")
     req.Header.Set("Content-Type", "application/json")
     
     client := &http.Client{}
@@ -421,7 +370,16 @@ func main() {
             </section>
           </div>
         </div>
-      </div>
-    </ProjectDashboardLayout>
+    </div>
+  );
+
+  if (projectId) {
+    return <ProjectDashboardLayout>{body}</ProjectDashboardLayout>;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container py-10">{body}</div>
+    </div>
   );
 }

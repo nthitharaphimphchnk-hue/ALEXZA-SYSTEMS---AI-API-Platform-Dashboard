@@ -55,17 +55,67 @@ type MockBilling = {
   updatedAt: string;
 };
 
+type MockUsageEvent = {
+  projectId: number;
+  timestamp: string;
+  endpoint: string;
+  status: number;
+  responseTimeMs: number;
+  credits: number;
+};
+
 type MockState = {
   user: MockUser;
   projects: MockProject[];
   apiKeys: MockApiKey[];
   billing: MockBilling[];
+  usageEvents: MockUsageEvent[];
 };
 
 let state: MockState | undefined;
 
+const USAGE_EVENTS_KEY = "alexza_mock_usage_events";
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function loadUsageEvents(): MockUsageEvent[] {
+  try {
+    const raw = localStorage.getItem(USAGE_EVENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed as MockUsageEvent[];
+  } catch {
+    return [];
+  }
+}
+
+function persistUsageEvents(events: MockUsageEvent[]) {
+  try {
+    localStorage.setItem(USAGE_EVENTS_KEY, JSON.stringify(events.slice(0, 200)));
+  } catch {
+    // ignore
+  }
+}
+
+function seedUsageEvents(): MockUsageEvent[] {
+  // Generate stable-looking history for mock mode so Usage never feels empty.
+  const now = Date.now();
+  const events: MockUsageEvent[] = [];
+  for (let i = 0; i < 30; i++) {
+    const ts = new Date(now - i * 42 * 60_000).toISOString(); // ~ every 42 minutes
+    events.push({
+      projectId: 1,
+      timestamp: ts,
+      endpoint: "POST /tti/decide-font",
+      status: i % 11 === 0 ? 429 : 200,
+      responseTimeMs: 90 + (i * 19) % 180,
+      credits: 1,
+    });
+  }
+  return events;
 }
 
 function initState(): MockState {
@@ -124,16 +174,27 @@ function initState(): MockState {
       projectId: 1,
       billingCycleStart: cycleStart.toISOString(),
       billingCycleEnd: cycleEnd.toISOString(),
-      totalRequests: 123,
+      totalRequests: 0,
       quotaLimit: 1000,
-      totalCost: 12345,
+      totalCost: 0,
       status: "active",
       createdAt: ts,
       updatedAt: ts,
     },
   ];
 
-  return { user, projects, apiKeys, billing };
+  const persisted = loadUsageEvents();
+  const usageEvents = persisted.length > 0 ? persisted : seedUsageEvents();
+  persistUsageEvents(usageEvents);
+
+  // Derive billing totals from usage events (1 request = 1 credit in mock mode).
+  billing[0] = {
+    ...billing[0]!,
+    totalRequests: usageEvents.filter((e) => e.projectId === 1).length,
+    totalCost: usageEvents.filter((e) => e.projectId === 1).reduce((sum, e) => sum + e.credits, 0),
+  };
+
+  return { user, projects, apiKeys, billing, usageEvents };
 }
 
 function getState(): MockState {
@@ -198,26 +259,49 @@ function ensureProject(projectId: number): MockProject | null {
   return st.projects.find((p) => p.id === projectId) ?? null;
 }
 
-function mockUsageStats() {
-  return {
-    totalRequests: 123,
-    successRate: 99.2,
-    avgResponseTime: 120,
-    totalCost: 12345,
-  };
+function getEventsForWindow(projectId: number, hours: number) {
+  const st = getState();
+  const since = Date.now() - hours * 60 * 60 * 1000;
+  return st.usageEvents
+    .filter((e) => e.projectId === projectId && new Date(e.timestamp).getTime() >= since)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
-function mockUsageByHour(hours: number) {
+function mockUsageStats(projectId: number, hours: number) {
+  const events = getEventsForWindow(projectId, hours);
+  const totalRequests = events.length;
+  const successCount = events.filter((e) => e.status >= 200 && e.status < 400).length;
+  const avgResponseTime = totalRequests
+    ? Math.round(events.reduce((sum, e) => sum + e.responseTimeMs, 0) / totalRequests)
+    : 0;
+  const totalCost = events.reduce((sum, e) => sum + e.credits, 0);
+  const successRate = totalRequests ? (successCount / totalRequests) * 100 : 0;
+
+  return { totalRequests, successRate, avgResponseTime, totalCost };
+}
+
+function mockUsageByHour(projectId: number, hours: number) {
+  const events = getEventsForWindow(projectId, hours);
+  const buckets = new Map<string, { hour: string; requests: number; cost: number }>();
+
+  for (const e of events) {
+    const d = new Date(e.timestamp);
+    d.setMinutes(0, 0, 0);
+    const hour = d.toISOString();
+    const b = buckets.get(hour) ?? { hour, requests: 0, cost: 0 };
+    b.requests += 1;
+    b.cost += e.credits;
+    buckets.set(hour, b);
+  }
+
+  // Ensure empty hours are still present so the chart feels continuous.
   const out: { hour: string; requests: number; cost: number }[] = [];
   const now = Date.now();
   for (let i = hours - 1; i >= 0; i--) {
     const d = new Date(now - i * 60 * 60 * 1000);
     d.setMinutes(0, 0, 0);
-    out.push({
-      hour: d.toISOString(),
-      requests: Math.max(0, Math.round(5 + Math.sin(i / 3) * 4)),
-      cost: Math.max(0, Math.round(50 + Math.cos(i / 4) * 20)),
-    });
+    const hour = d.toISOString();
+    out.push(buckets.get(hour) ?? { hour, requests: 0, cost: 0 });
   }
   return out;
 }
@@ -237,6 +321,34 @@ function mockBillingPreview(projectId: number) {
     periodEnd: current.billingCycleEnd,
     planName: "Free",
   };
+}
+
+function recordUsageEvent(event: MockUsageEvent) {
+  const st = getState();
+  st.usageEvents.unshift(event);
+  persistUsageEvents(st.usageEvents);
+
+  let billing = st.billing.find((b) => b.projectId === event.projectId);
+  if (!billing) {
+    const ts = nowIso();
+    billing = {
+      id: event.projectId,
+      projectId: event.projectId,
+      billingCycleStart: st.billing[0]?.billingCycleStart ?? ts,
+      billingCycleEnd: st.billing[0]?.billingCycleEnd ?? ts,
+      totalRequests: 0,
+      quotaLimit: 1000,
+      totalCost: 0,
+      status: "active",
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    st.billing.push(billing);
+  }
+
+  billing.totalRequests += 1;
+  billing.totalCost += event.credits;
+  billing.updatedAt = nowIso();
 }
 
 function mockPlaygroundAnalyze(text: string) {
@@ -303,6 +415,18 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
         updatedAt: ts,
       };
       st.projects.push(project);
+      st.billing.push({
+        id,
+        projectId: id,
+        billingCycleStart: st.billing[0]?.billingCycleStart ?? ts,
+        billingCycleEnd: st.billing[0]?.billingCycleEnd ?? ts,
+        totalRequests: 0,
+        quotaLimit: 1000,
+        totalCost: 0,
+        status: "active",
+        createdAt: ts,
+        updatedAt: ts,
+      });
       return project;
     }
 
@@ -341,11 +465,15 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
     }
 
     // usage
-    case "usage.stats":
-      return mockUsageStats();
-    case "usage.byHour": {
+    case "usage.stats": {
+      const projectId = Number(inputJson?.projectId ?? 1) || 1;
       const hours = Number(inputJson?.hours ?? 24);
-      return mockUsageByHour(Number.isFinite(hours) ? hours : 24);
+      return mockUsageStats(projectId, Number.isFinite(hours) ? hours : 24);
+    }
+    case "usage.byHour": {
+      const projectId = Number(inputJson?.projectId ?? 1) || 1;
+      const hours = Number(inputJson?.hours ?? 24);
+      return mockUsageByHour(projectId, Number.isFinite(hours) ? hours : 24);
     }
 
     // billing
@@ -366,6 +494,20 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
 
     // playground
     case "playground.analyze": {
+      const ts = nowIso();
+      const rawProjectId = Number(inputJson?.projectId ?? 1);
+      const projectId = rawProjectId && rawProjectId > 0 ? rawProjectId : 1;
+      const responseTimeMs = 80 + Math.floor(Math.random() * 220);
+
+      recordUsageEvent({
+        projectId,
+        timestamp: ts,
+        endpoint: "POST /tti/decide-font",
+        status: 200,
+        responseTimeMs,
+        credits: 1,
+      });
+
       const text = String(inputJson?.text ?? "");
       return mockPlaygroundAnalyze(text);
     }

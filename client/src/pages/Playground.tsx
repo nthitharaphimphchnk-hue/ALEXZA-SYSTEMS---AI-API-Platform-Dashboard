@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { isMockMode } from "@/_core/mock/mockMode";
 import {
   ArrowRight,
   Brain,
@@ -16,7 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 
 interface PlaygroundResult {
@@ -54,6 +55,7 @@ export default function Playground() {
   const params = useParams<{ id?: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
   const isStandalone = !params.id; // Standalone mode when no project ID
+  const [, setLocation] = useLocation();
 
   const [inputText, setInputText] = useState("");
   const [result, setResult] = useState<PlaygroundResult | null>(null);
@@ -109,6 +111,53 @@ export default function Playground() {
             Test the TTI API interactively. Enter Thai text to see the full processing pipeline.
           </p>
         </div>
+
+        {result ? (
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  This request will appear in <span className="text-foreground font-medium">Usage</span>
+                  {isMockMode() ? " (mock data)" : ""}.
+                </p>
+                <div className="flex items-center gap-2">
+                  {projectId ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setLocation(`/project/${projectId}/usage`)}
+                      >
+                        View Usage <ArrowRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setLocation(`/project/${projectId}/docs#endpoints`)}
+                      >
+                        Endpoint docs <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setLocation("/quickstart")}
+                    >
+                      View quickstart <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                You can reuse the request example from API Keys or Documentation in your app.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Input Section */}
