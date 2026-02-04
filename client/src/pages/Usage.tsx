@@ -31,7 +31,7 @@ export default function Usage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
   const [timeRange, setTimeRange] = useState("24");
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const { data: stats, isLoading: statsLoading } = trpc.usage.stats.useQuery(
     { projectId: projectId!, hours: parseInt(timeRange) },
@@ -55,7 +55,7 @@ export default function Usage() {
   );
 
   const chartData = hourlyData?.map((item) => ({
-    hour: new Date(item.hour).toLocaleTimeString("en-US", {
+    hour: new Date(item.hour).toLocaleTimeString(language === "th" ? "th-TH" : "en-US", {
       hour: "2-digit",
       minute: "2-digit",
     }),
@@ -86,7 +86,7 @@ export default function Usage() {
     const now = Date.now();
     return Array.from({ length: 10 }).map((_, i) => ({
       timestamp: new Date(now - i * 6 * 60_000).toISOString(),
-      endpoint: "POST /tti/decide-font",
+      endpoint: t("usage.endpoint.decideFont"),
       status: i % 9 === 0 ? 429 : 200,
       responseTimeMs: 90 + (i * 17) % 120,
       credits: 1,
@@ -99,27 +99,25 @@ export default function Usage() {
         {/* Header with Branding */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <img src="/alexza-logo-full.png" alt="ALEXZA SYSTEMS" className="h-10 w-auto" />
+            <img src="/alexza-logo-full.png" alt={t("brand.name")} className="h-10 w-auto" />
             <div>
-              <h2 className="text-lg font-semibold">ALEXZA SYSTEMS</h2>
-              <p className="text-sm text-muted-foreground">Developer Platform for AI APIs</p>
+              <h2 className="text-lg font-semibold">{t("brand.name")}</h2>
+              <p className="text-sm text-muted-foreground">{t("brand.tagline")}</p>
             </div>
           </div>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h1 className="text-2xl font-semibold tracking-tight">Usage Analytics</h1>
-              <p className="text-muted-foreground">
-                Monitor your API usage patterns and performance metrics.
-              </p>
+              <h1 className="text-2xl font-semibold tracking-tight">{t("usage.analyticsTitle")}</h1>
+              <p className="text-muted-foreground">{t("usage.analyticsDescription")}</p>
             </div>
             <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="24">Last 24 hours</SelectItem>
-              <SelectItem value="168">Last 7 days</SelectItem>
-              <SelectItem value="720">Last 30 days</SelectItem>
+              <SelectItem value="24">{t("usage.range.24h")}</SelectItem>
+              <SelectItem value="168">{t("usage.range.7d")}</SelectItem>
+              <SelectItem value="720">{t("usage.range.30d")}</SelectItem>
             </SelectContent>
             </Select>
           </div>
@@ -130,7 +128,7 @@ export default function Usage() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Requests
+                {t("usage.requests")}
               </CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -148,7 +146,7 @@ export default function Usage() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Success Rate
+                {t("usage.successRate")}
               </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -166,7 +164,7 @@ export default function Usage() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Avg Response Time
+                {t("usage.avgResponseTime")}
               </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -174,7 +172,12 @@ export default function Usage() {
               {statsLoading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
-                <div className="text-2xl font-bold">{stats?.avgResponseTime || 0}ms</div>
+                <div className="text-2xl font-bold">
+                  {stats?.avgResponseTime || 0}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {t("common.ms")}
+                  </span>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -182,7 +185,7 @@ export default function Usage() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Credits used
+                {t("usage.creditsUsed")}
               </CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -194,7 +197,7 @@ export default function Usage() {
                   <div className="text-2xl font-bold">
                     {preview ? `${preview.creditsUsed.toLocaleString()} / ${preview.quota.toLocaleString()}` : "—"}
                   </div>
-                  <p className="text-xs text-muted-foreground">Credits are counted per request.</p>
+                  <p className="text-xs text-muted-foreground">{t("usage.creditsNote")}</p>
                 </div>
               )}
             </CardContent>
@@ -206,8 +209,8 @@ export default function Usage() {
           {/* Requests Chart */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Request Volume</CardTitle>
-              <CardDescription>Requests over time</CardDescription>
+              <CardTitle className="text-lg">{t("usage.requestVolume")}</CardTitle>
+              <CardDescription>{t("usage.requestVolumeDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               {hourlyLoading ? (
@@ -263,8 +266,8 @@ export default function Usage() {
           {/* Recent activity */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Recent activity</CardTitle>
-              <CardDescription>Latest requests and status</CardDescription>
+              <CardTitle className="text-lg">{t("usage.recentActivity")}</CardTitle>
+              <CardDescription>{t("usage.recentActivityDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               {recentLoading ? (
@@ -273,11 +276,11 @@ export default function Usage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Endpoint</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Latency</TableHead>
-                      <TableHead className="text-right">Credits</TableHead>
+                      <TableHead>{t("usage.table.time")}</TableHead>
+                      <TableHead>{t("usage.table.endpoint")}</TableHead>
+                      <TableHead>{t("usage.table.status")}</TableHead>
+                      <TableHead className="text-right">{t("usage.table.latency")}</TableHead>
+                      <TableHead className="text-right">{t("usage.table.credits")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -301,7 +304,8 @@ export default function Usage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {row.responseTimeMs}ms
+                          {row.responseTimeMs}
+                          {t("common.ms")}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {row.credits}
@@ -314,8 +318,8 @@ export default function Usage() {
                 <div className="h-[300px] flex items-center justify-center">
                   <EmptyState
                     icon={Activity}
-                    title="Recent activity"
-                    description="Recent request logs will appear here."
+                    title={t("usage.recentActivityEmptyTitle")}
+                    description={t("usage.recentActivityEmptyDescription")}
                   />
                 </div>
               )}

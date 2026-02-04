@@ -71,18 +71,18 @@ export default function ProjectSelector() {
         <Card className="w-full max-w-md border-border/50">
           <CardHeader className="text-center space-y-4">
             <div className="mx-auto flex flex-col items-center gap-4">
-              <img src="/alexza-logo-full.png" alt="ALEXZA SYSTEMS" className="h-20 w-auto" />
+              <img src="/alexza-logo-full.png" alt={t("brand.name")} className="h-20 w-auto" />
               <div className="text-center space-y-2">
-                <CardTitle className="text-2xl">ALEXZA SYSTEMS</CardTitle>
+                <CardTitle className="text-2xl">{t("brand.name")}</CardTitle>
                 <CardDescription className="text-base">
-                  Developer Platform for AI APIs
+                  {t("brand.tagline")}
                 </CardDescription>
               </div>
             </div>
             <CardDescription className="text-base text-center">
               {status === "disabled"
-                ? "Sign in is not configured for this environment."
-                : "Sign in to access your TTI API projects and developer dashboard."}
+                ? t("auth.signIn.disabledMessage")
+                : t("auth.signIn.projectAccess")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -92,7 +92,7 @@ export default function ProjectSelector() {
               disabled={status === "disabled"}
               onClick={login}
             >
-              {status === "disabled" ? "Sign in (not configured)" : "Sign in to continue"}
+              {status === "disabled" ? t("auth.signIn.disabled") : t("auth.signIn.continue")}
             </Button>
           </CardContent>
         </Card>
@@ -105,10 +105,10 @@ export default function ProjectSelector() {
       <header className="border-b border-border/50 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
           <a href="/" className="flex items-center gap-3">
-            <img src="/alexza-logo-full.png" alt="ALEXZA SYSTEMS" className="h-10 w-auto" />
+            <img src="/alexza-logo-full.png" alt={t("brand.name")} className="h-10 w-auto" />
             <div className="flex flex-col">
-              <span className="text-base font-semibold tracking-tight">ALEXZA SYSTEMS</span>
-              <span className="text-xs text-muted-foreground">Developer Platform for AI APIs</span>
+              <span className="text-base font-semibold tracking-tight">{t("brand.name")}</span>
+              <span className="text-xs text-muted-foreground">{t("brand.tagline")}</span>
             </div>
           </a>
           <div className="flex items-center gap-4">
@@ -167,7 +167,7 @@ export default function ProjectSelector() {
               <DialogHeader>
                 <DialogTitle>{t("projects.createNew")}</DialogTitle>
                 <DialogDescription>
-                  Set up a new project to start using the TTI API.
+                  {t("projects.createDescription")}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -175,7 +175,7 @@ export default function ProjectSelector() {
                   <Label htmlFor="name">{t("projects.name")}</Label>
                   <Input
                     id="name"
-                    placeholder="My TTI Project"
+                    placeholder={t("projects.namePlaceholder")}
                     value={newProject.name}
                     onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
                   />
@@ -184,7 +184,7 @@ export default function ProjectSelector() {
                   <Label htmlFor="description">{t("projects.description")}</Label>
                   <Textarea
                     id="description"
-                    placeholder="Describe your project..."
+                    placeholder={t("projects.descriptionPlaceholder")}
                     value={newProject.description}
                     onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
                     rows={3}
@@ -246,7 +246,7 @@ export default function ProjectSelector() {
                           {project.name}
                         </CardTitle>
                         <CardDescription className="line-clamp-2">
-                          {project.description || "No description"}
+                          {project.description || t("projects.noDescription")}
                         </CardDescription>
                       </div>
                       <span
@@ -264,7 +264,10 @@ export default function ProjectSelector() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Created {format(new Date(project.createdAt), "MMM d, yyyy")}</span>
+                      <span>
+                        {t("projects.createdLabel")}{" "}
+                        {format(new Date(project.createdAt), "MMM d, yyyy")}
+                      </span>
                       <span
                         className={`flex items-center gap-1.5 ${
                           project.status === "active" ? "text-foreground" : "text-muted-foreground"
@@ -273,7 +276,7 @@ export default function ProjectSelector() {
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           project.status === "active" ? "bg-foreground" : "bg-muted-foreground"
                         }`} />
-                        {project.status}
+                        {t(`status.${project.status}`)}
                       </span>
                     </div>
                   </CardContent>

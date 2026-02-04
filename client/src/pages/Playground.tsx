@@ -19,6 +19,7 @@ import {
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PlaygroundResult {
   steps: {
@@ -52,6 +53,7 @@ interface PlaygroundResult {
 }
 
 export default function Playground() {
+  const { t } = useLanguage();
   const params = useParams<{ id?: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
   const isStandalone = !params.id; // Standalone mode when no project ID
@@ -70,20 +72,20 @@ export default function Playground() {
       try {
         const code = error.data?.code as string | undefined;
         if (code === "TOO_MANY_REQUESTS") {
-          toast.error("Rate limit exceeded. Please try again later.");
+          toast.error(t("errors.rateLimit"));
           return;
         }
         if (code === "BAD_REQUEST") {
-          toast.error("Invalid request", { description: error.message ?? undefined });
+          toast.error(t("errors.badRequest"), { description: error.message ?? undefined });
           return;
         }
         if (code === "PRECONDITION_FAILED") {
-          toast.error("TTI API not configured");
+          toast.error(t("playground.notConfigured"));
           return;
         }
-        toast.error("Analysis failed", { description: error.message ?? "Something went wrong." });
+        toast.error(t("playground.analysisFailed"), { description: error.message ?? t("errors.generic") });
       } catch {
-        toast.error("Analysis failed", { description: "Something went wrong." });
+        toast.error(t("playground.analysisFailed"), { description: t("errors.generic") });
       }
     },
   });
@@ -97,19 +99,17 @@ export default function Playground() {
   };
 
   const steps = [
-    { icon: FileText, label: "Input", description: "Text input received" },
-    { icon: Brain, label: "AI Translation", description: "Analyzing intent" },
-    { icon: Settings2, label: "Rule Engine", description: "Applying rules" },
-    { icon: Sparkles, label: "Result", description: "Output generated" },
+    { icon: FileText, label: t("playground.step.input"), description: t("playground.step.inputDesc") },
+    { icon: Brain, label: t("playground.step.translation"), description: t("playground.step.translationDesc") },
+    { icon: Settings2, label: t("playground.step.ruleEngine"), description: t("playground.step.ruleEngineDesc") },
+    { icon: Sparkles, label: t("playground.step.result"), description: t("playground.step.resultDesc") },
   ];
 
   const content = (
     <div className="space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Playground</h1>
-          <p className="text-muted-foreground">
-            Test the TTI API interactively. Enter Thai text to see the full processing pipeline.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("playground.title")}</h1>
+          <p className="text-muted-foreground">{t("playground.subtitle")}</p>
         </div>
 
         {result ? (
@@ -117,8 +117,9 @@ export default function Playground() {
             <CardContent className="pt-6 space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground">
-                  This request will appear in <span className="text-foreground font-medium">Usage</span>
-                  {isMockMode() ? " (mock data)" : ""}.
+                  {t("playground.usageHint")}{" "}
+                  <span className="text-foreground font-medium">{t("nav.usage")}</span>
+                  {isMockMode() ? ` ${t("playground.mockData")}` : ""}.
                 </p>
                 <div className="flex items-center gap-2">
                   {projectId ? (
@@ -129,7 +130,7 @@ export default function Playground() {
                         className="gap-2"
                         onClick={() => setLocation(`/project/${projectId}/usage`)}
                       >
-                        View Usage <ArrowRight className="h-4 w-4" />
+                        {t("playground.viewUsage")} <ArrowRight className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
@@ -137,7 +138,7 @@ export default function Playground() {
                         className="gap-2"
                         onClick={() => setLocation(`/project/${projectId}/docs#endpoints`)}
                       >
-                        Endpoint docs <ArrowRight className="h-4 w-4" />
+                        {t("playground.endpointDocs")} <ArrowRight className="h-4 w-4" />
                       </Button>
                     </>
                   ) : (
@@ -147,14 +148,12 @@ export default function Playground() {
                       className="gap-2"
                       onClick={() => setLocation("/quickstart")}
                     >
-                      View quickstart <ArrowRight className="h-4 w-4" />
+                      {t("playground.viewQuickstart")} <ArrowRight className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                You can reuse the request example from API Keys or Documentation in your app.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("playground.reuseHint")}</p>
             </CardContent>
           </Card>
         ) : null}
@@ -165,15 +164,15 @@ export default function Playground() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                Input Text
+                {t("playground.inputTitle")}
               </CardTitle>
               <CardDescription>
-                Enter Thai text to analyze through the TTI pipeline.
+                {t("playground.inputDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
-                placeholder="พิมพ์ข้อความภาษาไทยที่นี่เพื่อทดสอบระบบ TTI API..."
+                placeholder={t("playground.inputPlaceholder")}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 rows={8}
@@ -181,7 +180,7 @@ export default function Playground() {
               />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  {inputText.length} characters
+                  {inputText.length} {t("playground.characters")}
                 </span>
                 <Button
                   onClick={handleAnalyze}
@@ -193,7 +192,7 @@ export default function Playground() {
                   ) : (
                     <Play className="h-4 w-4" />
                   )}
-                  Analyze
+                  {t("playground.analyze")}
                 </Button>
               </div>
             </CardContent>
@@ -204,10 +203,10 @@ export default function Playground() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary" />
-                Processing Pipeline
+                {t("playground.pipelineTitle")}
               </CardTitle>
               <CardDescription>
-                Watch the text flow through each processing stage.
+                {t("playground.pipelineDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -258,7 +257,8 @@ export default function Playground() {
                 <div className="mt-6 pt-6 border-t border-border">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    Completed in {result.metadata.responseTimeMs}ms
+                    {t("playground.completedIn")} {result.metadata.responseTimeMs}
+                    {t("common.ms")}
                   </div>
                 </div>
               )}
@@ -274,27 +274,27 @@ export default function Playground() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Brain className="h-5 w-5 text-primary" />
-                  AI Intent Translation
+                  {t("playground.aiTranslationTitle")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 bg-secondary rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Language</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t("playground.language")}</p>
                     <p className="font-medium">{result.steps.aiTranslation.detected_language.toUpperCase()}</p>
                   </div>
                   <div className="p-3 bg-secondary rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Confidence</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t("playground.confidence")}</p>
                     <p className="font-medium">{(result.steps.aiTranslation.confidence * 100).toFixed(1)}%</p>
                   </div>
                 </div>
                 <div className="p-3 bg-secondary rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Intent</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("playground.intent")}</p>
                   <p className="font-medium">{result.steps.aiTranslation.intent}</p>
                 </div>
                 {result.steps.aiTranslation.entities.length > 0 && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">Detected Entities</p>
+                    <p className="text-xs text-muted-foreground mb-2">{t("playground.detectedEntities")}</p>
                     <div className="flex flex-wrap gap-2">
                       {result.steps.aiTranslation.entities.map((entity, i) => (
                         <span
@@ -315,12 +315,12 @@ export default function Playground() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Settings2 className="h-5 w-5 text-primary" />
-                  Rule Engine
+                  {t("playground.ruleEngineTitle")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Rules Applied</p>
+                  <p className="text-xs text-muted-foreground mb-2">{t("playground.rulesApplied")}</p>
                   <div className="space-y-2">
                     {result.steps.ruleEngine.rules_applied.map((rule, i) => (
                       <div
@@ -335,7 +335,7 @@ export default function Playground() {
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
-                          {rule.status}
+                          {t(`playground.ruleStatus.${rule.status}`)}
                         </span>
                       </div>
                     ))}
@@ -343,7 +343,7 @@ export default function Playground() {
                 </div>
                 {result.steps.ruleEngine.suggestions.length > 0 && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">Suggestions</p>
+                    <p className="text-xs text-muted-foreground mb-2">{t("playground.suggestions")}</p>
                     <ul className="space-y-1 text-sm text-muted-foreground">
                       {result.steps.ruleEngine.suggestions.map((suggestion, i) => (
                         <li key={i} className="flex items-start gap-2">
@@ -362,14 +362,14 @@ export default function Playground() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Final Result
+                  {t("playground.finalResult")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-6 md:grid-cols-3">
                   <div className="md:col-span-2 space-y-4">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-2">Processed Text</p>
+                      <p className="text-xs text-muted-foreground mb-2">{t("playground.processedText")}</p>
                       <div className="p-4 bg-secondary rounded-lg font-mono text-sm">
                         {result.steps.result.processed_text}
                       </div>
@@ -377,20 +377,20 @@ export default function Playground() {
                   </div>
                   <div className="space-y-4">
                     <div className="p-4 bg-primary/10 rounded-lg text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Typography Score</p>
+                      <p className="text-xs text-muted-foreground mb-1">{t("playground.typographyScore")}</p>
                       <p className="text-4xl font-bold text-primary">
                         {result.steps.result.typography_score}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-3 bg-secondary rounded-lg text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Characters</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("playground.characters")}</p>
                         <p className="text-xl font-semibold">
                           {result.steps.result.character_count}
                         </p>
                       </div>
                       <div className="p-3 bg-secondary rounded-lg text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Words</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("playground.words")}</p>
                         <p className="text-xl font-semibold">{result.steps.result.word_count}</p>
                       </div>
                     </div>
@@ -405,15 +405,15 @@ export default function Playground() {
         {!result && (
           <Card className="border-border/50 bg-card/50">
             <CardHeader>
-              <CardTitle className="text-lg">Sample Texts</CardTitle>
-              <CardDescription>Click to try these example inputs</CardDescription>
+              <CardTitle className="text-lg">{t("playground.sampleTextsTitle")}</CardTitle>
+              <CardDescription>{t("playground.sampleTextsDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[
-                  "สวัสดีครับ ยินดีต้อนรับสู่ระบบ TTI API",
-                  "การออกแบบตัวอักษรไทยที่ดีต้องคำนึงถึงความสวยงามและความอ่านง่าย",
-                  "ภาษาไทยมีวรรณยุกต์ 4 รูป และสระที่หลากหลาย ทำให้การจัดวางตัวอักษรมีความซับซ้อน",
+                  t("playground.sampleText1"),
+                  t("playground.sampleText2"),
+                  t("playground.sampleText3"),
                 ].map((text, i) => (
                   <button
                     key={i}
@@ -437,11 +437,11 @@ export default function Playground() {
         <header className="border-b border-border/50 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
           <div className="container flex h-16 items-center justify-between">
             <a href="/" className="flex items-center">
-              <img src="/alexza-logo.png" alt="ALEXZA" className="h-8 w-auto" />
+              <img src="/alexza-logo.png" alt={t("brand.name")} className="h-8 w-auto" />
             </a>
             <div className="flex items-center gap-4">
               <Button variant="outline" size="sm" asChild>
-                <a href="/">Back to Projects</a>
+                <a href="/">{t("projects.backToProjects")}</a>
               </Button>
             </div>
           </div>

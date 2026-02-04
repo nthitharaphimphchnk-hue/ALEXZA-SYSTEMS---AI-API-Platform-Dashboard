@@ -109,7 +109,7 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
   ];
 
   const settingsItems = [
-    { icon: Settings, label: "General", path: `/project/${projectId}/settings/general` },
+    { icon: Settings, label: t("settings.general"), path: `/project/${projectId}/settings/general` },
   ];
 
   const activeMenuItem = [...mainItems, ...settingsItems].find(
@@ -161,9 +161,9 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
               <a
                 href="/"
                 className="h-8 flex items-center hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="ALEXZA SYSTEMS"
+                aria-label={t("brand.name")}
               >
-                <img src="/alexza-logo.png" alt="ALEXZA" className="h-6 w-auto" />
+                <img src="/alexza-logo.png" alt={t("brand.name")} className="h-6 w-auto" />
               </a>
             </div>
           </SidebarHeader>
@@ -188,7 +188,7 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
               })}
             </SidebarMenu>
             <div className="px-4 pt-4 pb-2 text-xs uppercase tracking-wider text-muted-foreground">
-              Project Settings
+              {t("settings.section.projectSettings")}
             </div>
             <SidebarMenu className="px-2">
               {settingsItems.map((item) => {
@@ -230,7 +230,7 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => setLocation("/")} className="cursor-pointer">
                   <LayoutDashboard className="mr-2 h-4 w-4" />
-                  <span>All Projects</span>
+                  <span>{t("projects.all")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -238,7 +238,7 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>{t("nav.signOut")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -264,7 +264,7 @@ function ProjectDashboardContent({ children, setSidebarWidth }: ProjectDashboard
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
                   <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
+                    {activeMenuItem?.label ?? t("nav.menu")}
                   </span>
                 </div>
               </div>

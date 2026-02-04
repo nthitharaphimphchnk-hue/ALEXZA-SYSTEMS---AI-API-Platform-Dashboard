@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate";
+
 type JsonValue =
   | null
   | boolean
@@ -109,7 +111,7 @@ function seedUsageEvents(): MockUsageEvent[] {
     events.push({
       projectId: 1,
       timestamp: ts,
-      endpoint: "POST /tti/decide-font",
+      endpoint: translate("usage.endpoint.decideFont"),
       status: i % 11 === 0 ? 429 : 200,
       responseTimeMs: 90 + (i * 19) % 180,
       credits: 1,
@@ -123,7 +125,7 @@ function initState(): MockState {
   const user: MockUser = {
     id: 1,
     openId: "mock-dev-user",
-    name: "Dev User",
+    name: translate("mock.user.name"),
     email: "dev@local",
     loginMethod: "mock",
     role: "user",
@@ -137,7 +139,7 @@ function initState(): MockState {
       id: 1,
       userId: 1,
       name: "TTI",
-      description: "Local mock project",
+      description: translate("mock.project.description"),
       environment: "development",
       status: "active",
       createdAt: ts,
@@ -149,7 +151,7 @@ function initState(): MockState {
     {
       id: 1,
       projectId: 1,
-      name: "Default Key",
+      name: translate("mock.apiKey.defaultName"),
       keyHash: "mock",
       keyPrefix: "tti_mock_000",
       isActive: true,
@@ -319,7 +321,7 @@ function mockBillingPreview(projectId: number) {
     status: creditsUsed > quota ? "over_quota" : creditsUsed > quota * 0.8 ? "nearing_limit" : "normal",
     periodStart: current.billingCycleStart,
     periodEnd: current.billingCycleEnd,
-    planName: "Free",
+    planName: translate("mock.plan.free"),
   };
 }
 
@@ -398,7 +400,7 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
     case "project.get": {
       const id = Number(inputJson?.id);
       const project = ensureProject(id);
-      if (!project) throw new Error("Project not found");
+      if (!project) throw new Error(translate("errors.projectNotFound"));
       return project;
     }
     case "project.create": {
@@ -407,7 +409,7 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
       const project: MockProject = {
         id,
         userId: st.user.id,
-        name: String(inputJson?.name ?? "Untitled"),
+        name: String(inputJson?.name ?? translate("mock.project.untitled")),
         description: (inputJson?.description ?? null) as string | null,
         environment: (inputJson?.environment ?? "development") as MockProject["environment"],
         status: "active",
@@ -442,7 +444,7 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
       const apiKey: MockApiKey = {
         id,
         projectId: Number(inputJson?.projectId),
-        name: String(inputJson?.name ?? "API Key"),
+        name: String(inputJson?.name ?? translate("mock.apiKey.fallback")),
         keyHash: "mock",
         keyPrefix: key.substring(0, 12),
         isActive: true,
@@ -516,7 +518,7 @@ async function handleProcedure(path: string, inputJson: any): Promise<JsonValue>
       recordUsageEvent({
         projectId,
         timestamp: ts,
-        endpoint: "POST /tti/decide-font",
+          endpoint: translate("usage.endpoint.decideFont"),
         status: 200,
         responseTimeMs,
         credits: 1,
@@ -577,7 +579,7 @@ export async function tryHandleMockTrpcRequest(
       const data = await handleProcedure(path, inputJson);
       results.push(toTrpcOk(id, data as JsonValue));
     } catch (e) {
-      results.push(toTrpcErr(id, (e as Error)?.message ?? "Mock error"));
+      results.push(toTrpcErr(id, (e as Error)?.message ?? translate("errors.mock")));
     }
   }
 

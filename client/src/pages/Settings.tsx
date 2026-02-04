@@ -39,15 +39,15 @@ export default function Settings() {
     if (newIp && /^(\d{1,3}\.){3}\d{1,3}$/.test(newIp)) {
       setIpWhitelist([...ipWhitelist, newIp]);
       setNewIp("");
-      toast.success("IP address added");
+      toast.success(t("settings.security.ipAdded"));
     } else {
-      toast.error("Invalid IP address format");
+      toast.error(t("settings.security.ipInvalid"));
     }
   };
 
   const handleRemoveIp = (ip: string) => {
     setIpWhitelist(ipWhitelist.filter(i => i !== ip));
-    toast.success("IP address removed");
+    toast.success(t("settings.security.ipRemoved"));
   };
 
   const handleAddWebhook = () => {
@@ -60,25 +60,25 @@ export default function Settings() {
       }]);
       setNewWebhookUrl("");
       setSelectedEvents([]);
-      toast.success("Webhook added");
+      toast.success(t("settings.webhooks.added"));
     } else {
-      toast.error("Please provide URL and select at least one event");
+      toast.error(t("settings.webhooks.missingFields"));
     }
   };
 
   const availableEvents = [
-    { id: "api.key.created", label: "API Key Created" },
-    { id: "api.key.revoked", label: "API Key Revoked" },
-    { id: "quota.exceeded", label: "Quota Exceeded" },
-    { id: "quota.warning", label: "Quota Warning (80%)" },
-    { id: "unusual.activity", label: "Unusual Activity Detected" },
+    { id: "api.key.created", label: t("settings.notifications.event.apiKeyCreated") },
+    { id: "api.key.revoked", label: t("settings.notifications.event.apiKeyRevoked") },
+    { id: "quota.exceeded", label: t("settings.notifications.event.quotaExceeded") },
+    { id: "quota.warning", label: t("settings.notifications.event.quotaWarning") },
+    { id: "unusual.activity", label: t("settings.notifications.event.unusualActivity") },
   ];
 
   if (!project) {
     return (
       <ProjectDashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading settings...</p>
+          <p className="text-muted-foreground">{t("common.loading")}</p>
         </div>
       </ProjectDashboardLayout>
     );
@@ -131,7 +131,7 @@ export default function Settings() {
                   <Input
                     id="project-name"
                     defaultValue={project.name}
-                    placeholder="My Project"
+                    placeholder={t("settings.project.namePlaceholder")}
                   />
                   <p className="text-xs text-muted-foreground">
                     {t("settings.project.nameHelp")}
@@ -158,8 +158,8 @@ export default function Settings() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="th">ไทย</SelectItem>
+                      <SelectItem value="en">{t("language.english")}</SelectItem>
+                      <SelectItem value="th">{t("language.thai")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -174,10 +174,10 @@ export default function Settings() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="utc">UTC</SelectItem>
-                      <SelectItem value="asia/bangkok">Asia/Bangkok (UTC+7)</SelectItem>
-                      <SelectItem value="america/new_york">America/New York (UTC-5)</SelectItem>
-                      <SelectItem value="europe/london">Europe/London (UTC+0)</SelectItem>
+                      <SelectItem value="utc">{t("timezone.utc")}</SelectItem>
+                      <SelectItem value="asia/bangkok">{t("timezone.bangkok")}</SelectItem>
+                      <SelectItem value="america/new_york">{t("timezone.newYork")}</SelectItem>
+                      <SelectItem value="europe/london">{t("timezone.london")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -205,7 +205,7 @@ export default function Settings() {
                   <div className="flex gap-2">
                     <Input
                       id="new-ip"
-                      placeholder="192.168.1.1"
+                      placeholder={t("settings.security.ipPlaceholder")}
                       value={newIp}
                       onChange={(e) => setNewIp(e.target.value)}
                     />
@@ -335,7 +335,7 @@ export default function Settings() {
                   <Label htmlFor="webhook-url">{t("settings.webhooks.endpointUrl")}</Label>
                   <Input
                     id="webhook-url"
-                    placeholder="https://api.example.com/webhook"
+                    placeholder={t("settings.webhooks.urlPlaceholder")}
                     value={newWebhookUrl}
                     onChange={(e) => setNewWebhookUrl(e.target.value)}
                   />
@@ -406,7 +406,7 @@ export default function Settings() {
                               size="sm"
                               onClick={() => {
                                 setWebhooks(webhooks.filter(w => w.id !== webhook.id));
-                                toast.success("Webhook removed");
+                                toast.success(t("settings.webhooks.removed"));
                               }}
                               className="text-destructive hover:text-destructive"
                             >

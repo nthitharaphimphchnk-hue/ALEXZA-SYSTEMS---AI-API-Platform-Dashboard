@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Check, Copy } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ type CopyCodeBlockProps = {
 };
 
 export function CopyCodeBlock({ code, id, label }: CopyCodeBlockProps) {
+  const { t } = useLanguage();
   const reactId = useId();
   const [copied, setCopied] = useState(false);
   const key = id ?? reactId;
@@ -25,10 +27,10 @@ export function CopyCodeBlock({ code, id, label }: CopyCodeBlockProps) {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      toast.success("Copied");
+      toast.success(t("common.copied"));
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error("Copy failed");
+      toast.error(t("common.copyFailed"));
     }
   };
 
@@ -44,7 +46,7 @@ export function CopyCodeBlock({ code, id, label }: CopyCodeBlockProps) {
           <code>{code}</code>
         </pre>
         <Button
-          aria-label="Copy code"
+          aria-label={t("common.copy")}
           variant="ghost"
           size="icon"
           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"

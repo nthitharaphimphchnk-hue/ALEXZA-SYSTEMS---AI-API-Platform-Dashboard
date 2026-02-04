@@ -8,8 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { ApiStatusIndicator } from "@/components/ApiStatusIndicator";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ProjectOverview() {
+  const { t } = useLanguage();
   const params = useParams<{ id: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
@@ -40,10 +42,10 @@ export default function ProjectOverview() {
         {/* Header with Branding */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <img src="/alexza-logo-full.png" alt="ALEXZA SYSTEMS" className="h-10 w-auto" />
+            <img src="/alexza-logo-full.png" alt={t("brand.name")} className="h-10 w-auto" />
             <div>
-              <h2 className="text-lg font-semibold">ALEXZA SYSTEMS</h2>
-              <p className="text-sm text-muted-foreground">Developer Platform for AI APIs</p>
+              <h2 className="text-lg font-semibold">{t("brand.name")}</h2>
+              <p className="text-sm text-muted-foreground">{t("brand.tagline")}</p>
             </div>
           </div>
           {projectLoading ? (
@@ -66,11 +68,11 @@ export default function ProjectOverview() {
                           : "bg-primary/20 text-primary"
                       }`}
                     >
-                      {project?.environment}
+                      {project?.environment ? t(`projects.${project.environment}`) : ""}
                     </span>
                   </div>
                   <p className="text-muted-foreground">
-                    {project?.description || "TTI API Project Dashboard"}
+                    {project?.description || t("overview.fallbackDescription")}
                   </p>
                 </div>
                 <ApiStatusIndicator status="healthy" />
@@ -84,7 +86,7 @@ export default function ProjectOverview() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Requests (24h)
+                {t("overview.requests24h")}
               </CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -100,7 +102,7 @@ export default function ProjectOverview() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Success Rate
+                {t("overview.successRate")}
               </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -118,7 +120,7 @@ export default function ProjectOverview() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Avg Response Time
+                {t("overview.avgResponseTime")}
               </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -126,7 +128,12 @@ export default function ProjectOverview() {
               {statsLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                <div className="text-2xl font-bold">{stats?.avgResponseTime || 0}ms</div>
+                <div className="text-2xl font-bold">
+                  {stats?.avgResponseTime || 0}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {t("common.ms")}
+                  </span>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -134,7 +141,7 @@ export default function ProjectOverview() {
           <Card className="border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active API Keys
+                {t("overview.activeApiKeys")}
               </CardTitle>
               <Key className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -149,29 +156,29 @@ export default function ProjectOverview() {
           {/* API Status */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">TTI API Status</CardTitle>
-              <CardDescription>Current system health and availability</CardDescription>
+              <CardTitle className="text-lg">{t("overview.apiStatusTitle")}</CardTitle>
+              <CardDescription>{t("overview.apiStatusDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg bg-foreground/10 border border-border/20">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-foreground animate-pulse" />
-                  <span className="font-medium">All Systems Operational</span>
+                  <span className="font-medium">{t("overview.systemsOperational")}</span>
                 </div>
-                <span className="text-sm text-muted-foreground">99.9% uptime</span>
+                <span className="text-sm text-muted-foreground">{t("overview.uptime")}</span>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Text Analysis Endpoint</span>
-                  <span className="text-foreground">Operational</span>
+                  <span className="text-muted-foreground">{t("overview.endpoint.textAnalysis")}</span>
+                  <span className="text-foreground">{t("status.operational")}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Rule Engine</span>
-                  <span className="text-foreground">Operational</span>
+                  <span className="text-muted-foreground">{t("overview.endpoint.ruleEngine")}</span>
+                  <span className="text-foreground">{t("status.operational")}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">AI Translation Service</span>
-                  <span className="text-foreground">Operational</span>
+                  <span className="text-muted-foreground">{t("overview.endpoint.aiTranslation")}</span>
+                  <span className="text-foreground">{t("status.operational")}</span>
                 </div>
               </div>
             </CardContent>
@@ -180,8 +187,8 @@ export default function ProjectOverview() {
           {/* Quick Actions */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
-              <CardDescription>Common tasks and shortcuts</CardDescription>
+              <CardTitle className="text-lg">{t("overview.quickActions")}</CardTitle>
+              <CardDescription>{t("overview.quickActionsDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Button
@@ -191,8 +198,8 @@ export default function ProjectOverview() {
               >
                 <Zap className="h-4 w-4 text-primary" />
                 <div className="text-left">
-                  <div className="font-medium">Test in Playground</div>
-                  <div className="text-xs text-muted-foreground">Try the TTI API interactively</div>
+                  <div className="font-medium">{t("overview.action.playground")}</div>
+                  <div className="text-xs text-muted-foreground">{t("overview.action.playgroundDescription")}</div>
                 </div>
               </Button>
               <Button
@@ -202,8 +209,8 @@ export default function ProjectOverview() {
               >
                 <Key className="h-4 w-4 text-primary" />
                 <div className="text-left">
-                  <div className="font-medium">Manage API Keys</div>
-                  <div className="text-xs text-muted-foreground">Create or revoke access tokens</div>
+                  <div className="font-medium">{t("overview.action.manageKeys")}</div>
+                  <div className="text-xs text-muted-foreground">{t("overview.action.manageKeysDescription")}</div>
                 </div>
               </Button>
               <Button
@@ -213,8 +220,8 @@ export default function ProjectOverview() {
               >
                 <Activity className="h-4 w-4 text-primary" />
                 <div className="text-left">
-                  <div className="font-medium">View Documentation</div>
-                  <div className="text-xs text-muted-foreground">API reference and examples</div>
+                  <div className="font-medium">{t("overview.action.viewDocs")}</div>
+                  <div className="text-xs text-muted-foreground">{t("overview.action.viewDocsDescription")}</div>
                 </div>
               </Button>
             </CardContent>
@@ -225,7 +232,7 @@ export default function ProjectOverview() {
         {billing && (
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Current Billing Cycle</CardTitle>
+              <CardTitle className="text-lg">{t("overview.billingCycleTitle")}</CardTitle>
               <CardDescription>
                 {format(new Date(billing.billingCycleStart), "MMM d")} -{" "}
                 {format(new Date(billing.billingCycleEnd), "MMM d, yyyy")}
@@ -234,7 +241,7 @@ export default function ProjectOverview() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Requests Used</p>
+                  <p className="text-sm text-muted-foreground">{t("overview.requestsUsed")}</p>
                   <p className="text-2xl font-bold">
                     {billing.totalRequests.toLocaleString()}{" "}
                     <span className="text-sm font-normal text-muted-foreground">
@@ -243,7 +250,7 @@ export default function ProjectOverview() {
                   </p>
                 </div>
                 <div className="text-right space-y-1">
-                  <p className="text-sm text-muted-foreground">Estimated Cost</p>
+                  <p className="text-sm text-muted-foreground">{t("overview.estimatedCost")}</p>
                   <p className="text-2xl font-bold">
                     ${((billing.totalCost || 0) / 100).toFixed(2)}
                   </p>

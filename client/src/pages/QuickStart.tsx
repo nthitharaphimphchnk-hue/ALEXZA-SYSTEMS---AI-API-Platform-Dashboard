@@ -10,6 +10,8 @@ export default function QuickStart() {
   const { t } = useLanguage();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const sampleText = t("examples.sampleText");
+  const apiKeyPlaceholder = t("apiKeys.placeholderKey");
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -24,29 +26,29 @@ export default function QuickStart() {
       icon: Folder,
       title: t("quickstart.step1.title"),
       description: t("quickstart.step1.description"),
-      time: "30s",
+      time: t("quickstart.step1.time"),
     },
     {
       id: 2,
       icon: Key,
       title: t("quickstart.step2.title"),
       description: t("quickstart.step2.description"),
-      time: "15s",
+      time: t("quickstart.step2.time"),
     },
     {
       id: 3,
       icon: Zap,
       title: t("quickstart.step3.title"),
       description: t("quickstart.step3.description"),
-      time: "2min",
+      time: t("quickstart.step3.time"),
     },
   ];
 
   const curlExample = `curl -X POST https://api.alexza.systems/v1/tti/process \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Authorization: Bearer ${apiKeyPlaceholder}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "text": "ข้อความภาษาไทยที่ต้องการประมวลผล",
+    "text": "${sampleText}",
     "options": {
       "apply_rules": true,
       "return_analysis": true
@@ -57,11 +59,11 @@ export default function QuickStart() {
 
 url = "https://api.alexza.systems/v1/tti/process"
 headers = {
-    "Authorization": "Bearer YOUR_API_KEY",
+    "Authorization": "Bearer ${apiKeyPlaceholder}",
     "Content-Type": "application/json"
 }
 data = {
-    "text": "ข้อความภาษาไทยที่ต้องการประมวลผล",
+    "text": "${sampleText}",
     "options": {
         "apply_rules": True,
         "return_analysis": True
@@ -75,11 +77,11 @@ print(result)`;
   const javascriptExample = `const response = await fetch('https://api.alexza.systems/v1/tti/process', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
+    'Authorization': 'Bearer ${apiKeyPlaceholder}',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    text: 'ข้อความภาษาไทยที่ต้องการประมวลผล',
+    text: '${sampleText}',
     options: {
       apply_rules: true,
       return_analysis: true
@@ -125,9 +127,9 @@ console.log(result);`;
           
           <Tabs defaultValue="curl" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="curl">cURL</TabsTrigger>
-              <TabsTrigger value="python">Python</TabsTrigger>
-              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+              <TabsTrigger value="curl">{t("docs.examples.curl")}</TabsTrigger>
+              <TabsTrigger value="python">{t("docs.examples.python")}</TabsTrigger>
+              <TabsTrigger value="javascript">{t("docs.examples.javascript")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="curl" className="space-y-4">
@@ -405,9 +407,9 @@ console.log(result);`;
 
                   <Tabs defaultValue="curl" className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="curl">cURL</TabsTrigger>
-                      <TabsTrigger value="python">Python</TabsTrigger>
-                      <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+                      <TabsTrigger value="curl">{t("docs.examples.curl")}</TabsTrigger>
+                      <TabsTrigger value="python">{t("docs.examples.python")}</TabsTrigger>
+                      <TabsTrigger value="javascript">{t("docs.examples.javascript")}</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="curl" className="space-y-4">

@@ -37,8 +37,10 @@ import { ArrowRight, Check, Copy, Key, Loader2, Plus, Trash2 } from "lucide-reac
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ApiKeys() {
+  const { t } = useLanguage();
   const params = useParams<{ id: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
@@ -46,6 +48,7 @@ export default function ApiKeys() {
   const baseUrl =
     (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
     "https://api.alexza.systems";
+  const sampleText = t("examples.sampleText");
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
@@ -66,7 +69,7 @@ export default function ApiKeys() {
       utils.apiKey.list.invalidate({ projectId: projectId! });
     },
     onError: (error) => {
-      toast.error("Failed to create API key", { description: error.message });
+      toast.error(t("apiKeys.createFailed"), { description: error.message });
     },
   });
 
@@ -74,10 +77,10 @@ export default function ApiKeys() {
     onSuccess: () => {
       setKeyToRevoke(null);
       utils.apiKey.list.invalidate({ projectId: projectId! });
-      toast.success("API key revoked successfully");
+      toast.success(t("apiKeys.revoked"));
     },
     onError: (error) => {
-      toast.error("Failed to revoke API key", { description: error.message });
+      toast.error(t("apiKeys.revokeFailed"), { description: error.message });
     },
   });
 
@@ -89,7 +92,7 @@ export default function ApiKeys() {
   const handleCopyKey = async (key: string) => {
     await navigator.clipboard.writeText(key);
     setCopiedKey(key);
-    toast.success("API key copied to clipboard");
+    toast.success(t("apiKeys.copied"));
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
@@ -105,41 +108,37 @@ export default function ApiKeys() {
         {/* Header with Branding */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <img src="/alexza-logo-full.png" alt="ALEXZA SYSTEMS" className="h-10 w-auto" />
+            <img src="/alexza-logo-full.png" alt={t("brand.name")} className="h-10 w-auto" />
             <div>
-              <h2 className="text-lg font-semibold">ALEXZA SYSTEMS</h2>
-              <p className="text-sm text-muted-foreground">Developer Platform for AI APIs</p>
+              <h2 className="text-lg font-semibold">{t("brand.name")}</h2>
+              <p className="text-sm text-muted-foreground">{t("brand.tagline")}</p>
             </div>
           </div>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
-              <p className="text-muted-foreground">
-                Manage authentication tokens for accessing the TTI API.
-              </p>
+              <h1 className="text-2xl font-semibold tracking-tight">{t("apiKeys.title")}</h1>
+              <p className="text-muted-foreground">{t("apiKeys.subtitle")}</p>
             </div>
             <Dialog open={isCreateOpen} onOpenChange={(open) => !open && handleCloseCreate()}>
             <DialogTrigger asChild>
               <Button className="gap-2" onClick={() => setIsCreateOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Create New Key
+                {t("apiKeys.create")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               {!newKeyValue ? (
                 <>
                   <DialogHeader>
-                    <DialogTitle>Create New API Key</DialogTitle>
-                    <DialogDescription>
-                      Give your API key a descriptive name to identify it later.
-                    </DialogDescription>
+                    <DialogTitle>{t("apiKeys.createDialogTitle")}</DialogTitle>
+                    <DialogDescription>{t("apiKeys.createDialogDescription")}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="keyName">Key Name</Label>
+                      <Label htmlFor="keyName">{t("apiKeys.name")}</Label>
                       <Input
                         id="keyName"
-                        placeholder="e.g., Production Server"
+                        placeholder={t("apiKeys.namePlaceholder")}
                         value={newKeyName}
                         onChange={(e) => setNewKeyName(e.target.value)}
                       />
@@ -147,24 +146,22 @@ export default function ApiKeys() {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={handleCloseCreate}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       onClick={handleCreateKey}
                       disabled={!newKeyName.trim() || createKey.isPending}
                     >
                       {createKey.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Create Key
+                      {t("apiKeys.create")}
                     </Button>
                   </DialogFooter>
                 </>
               ) : (
                 <>
                   <DialogHeader>
-                    <DialogTitle>API Key Created</DialogTitle>
-                    <DialogDescription>
-                      Copy your API key now. You won't be able to see it again.
-                    </DialogDescription>
+                    <DialogTitle>{t("apiKeys.createdTitle")}</DialogTitle>
+                    <DialogDescription>{t("apiKeys.createdDescription")}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="p-4 bg-secondary rounded-lg border border-border">
@@ -184,13 +181,10 @@ export default function ApiKeys() {
                         </Button>
                       </div>
                     </div>
-                    <p className="text-sm text-destructive">
-                      Make sure to copy your API key now. For security reasons, it won't be shown
-                      again.
-                    </p>
+                    <p className="text-sm text-destructive">{t("apiKeys.copyWarning")}</p>
                   </div>
                   <DialogFooter>
-                    <Button onClick={handleCloseCreate}>Done</Button>
+                    <Button onClick={handleCloseCreate}>{t("common.done")}</Button>
                   </DialogFooter>
                 </>
               )}
@@ -198,13 +192,13 @@ export default function ApiKeys() {
             </Dialog>
           </div>
           <p className="text-xs text-muted-foreground">
-            Requests made with this key will appear in{" "}
+            {t("apiKeys.usageHint")}{" "}
             <button
               className="underline underline-offset-4 hover:text-foreground transition-colors"
               onClick={() => projectId && setLocation(`/project/${projectId}/usage`)}
               type="button"
             >
-              Usage
+              {t("nav.usage")}
             </button>
             .
           </p>
@@ -215,10 +209,8 @@ export default function ApiKeys() {
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <CardTitle className="text-lg">Quickstart</CardTitle>
-                <CardDescription>
-                  Create a key, copy the request, and make your first API call.
-                </CardDescription>
+                <CardTitle className="text-lg">{t("apiKeys.quickstartTitle")}</CardTitle>
+                <CardDescription>{t("apiKeys.quickstartDescription")}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -226,7 +218,7 @@ export default function ApiKeys() {
                   className="gap-2"
                   onClick={() => projectId && setLocation(`/project/${projectId}/docs`)}
                 >
-                  View full documentation <ArrowRight className="h-4 w-4" />
+                  {t("apiKeys.viewDocs")} <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -234,27 +226,27 @@ export default function ApiKeys() {
           <CardContent className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Step 1 — Authentication</p>
+                <p className="text-xs text-muted-foreground">{t("apiKeys.quickstart.step1")}</p>
                 <CopyCodeBlock
                   id="keys-auth-header"
-                  code={`Authorization: Bearer ${newKeyValue ?? "tti_your_api_key_here"}`}
+                  code={`Authorization: Bearer ${newKeyValue ?? t("apiKeys.placeholderKey")}`}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Bearer key in the Authorization header.
+                  {t("apiKeys.quickstart.authDescription")}
                 </p>
               </div>
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Step 2 — Base URL</p>
+                <p className="text-xs text-muted-foreground">{t("apiKeys.quickstart.step2")}</p>
                 <CopyCodeBlock id="keys-base-url" code={baseUrl} />
-                <p className="text-xs text-muted-foreground">Requests are counted per request (credits).</p>
+                <p className="text-xs text-muted-foreground">{t("usage.creditsNote")}</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Step 3 — First request</p>
+              <p className="text-xs text-muted-foreground">{t("apiKeys.quickstart.step3")}</p>
               <CopyCodeBlock
                 id="keys-first-request"
-                code={`curl -X POST "${baseUrl}/tti/decide-font" \\\n  -H "Authorization: Bearer ${newKeyValue ?? "tti_your_api_key_here"}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"text":"สวัสดีครับ"}'`}
+                code={`curl -X POST "${baseUrl}/tti/decide-font" \\\n  -H "Authorization: Bearer ${newKeyValue ?? t("apiKeys.placeholderKey")}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"text":"${sampleText}"}'`}
               />
               <div className="flex items-center gap-3">
                 <Button
@@ -262,10 +254,10 @@ export default function ApiKeys() {
                   className="gap-2"
                   onClick={() => projectId && setLocation(`/project/${projectId}/usage`)}
                 >
-                  View your usage <ArrowRight className="h-4 w-4" />
+                  {t("apiKeys.viewUsage")} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  After you send requests, you’ll see them in Usage.
+                  {t("apiKeys.usageAfterHint")}
                 </p>
               </div>
             </div>
@@ -274,10 +266,8 @@ export default function ApiKeys() {
 
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle className="text-lg">Active Keys</CardTitle>
-            <CardDescription>
-              All active API keys for this project. Revoked keys are not shown.
-            </CardDescription>
+            <CardTitle className="text-lg">{t("apiKeys.activeTitle")}</CardTitle>
+            <CardDescription>{t("apiKeys.activeDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -288,11 +278,11 @@ export default function ApiKeys() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Key</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Last Used</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                    <TableHead>{t("apiKeys.table.name")}</TableHead>
+                    <TableHead>{t("apiKeys.table.key")}</TableHead>
+                    <TableHead>{t("apiKeys.table.created")}</TableHead>
+                    <TableHead>{t("apiKeys.table.lastUsed")}</TableHead>
+                    <TableHead className="w-[100px]">{t("apiKeys.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -310,7 +300,7 @@ export default function ApiKeys() {
                       <TableCell className="text-muted-foreground">
                         {key.lastUsedAt
                           ? format(new Date(key.lastUsedAt), "MMM d, yyyy HH:mm")
-                          : "Never"}
+                          : t("common.never")}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -331,13 +321,13 @@ export default function ApiKeys() {
                 <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-4">
                   <Key className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <h3 className="font-medium mb-1">No API keys yet</h3>
+                <h3 className="font-medium mb-1">{t("apiKeys.empty")}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Create your first API key to start using the TTI API.
+                  {t("apiKeys.emptyDescription")}
                 </p>
                 <Button onClick={() => setIsCreateOpen(true)} variant="outline" className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Create API Key
+                  {t("apiKeys.create")}
                 </Button>
               </div>
             )}
@@ -346,24 +336,24 @@ export default function ApiKeys() {
 
         <Card className="border-border/50 bg-card/50">
           <CardHeader>
-            <CardTitle className="text-lg">Security Best Practices</CardTitle>
+            <CardTitle className="text-lg">{t("apiKeys.securityTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              <strong className="text-foreground">Keep keys secret:</strong> Never expose API keys
-              in client-side code or public repositories.
+              <strong className="text-foreground">{t("apiKeys.security.keepSecretLabel")}</strong>{" "}
+              {t("apiKeys.security.keepSecret")}
             </p>
             <p>
-              <strong className="text-foreground">Use environment variables:</strong> Store keys in
-              environment variables, not in your codebase.
+              <strong className="text-foreground">{t("apiKeys.security.envLabel")}</strong>{" "}
+              {t("apiKeys.security.env")}
             </p>
             <p>
-              <strong className="text-foreground">Rotate regularly:</strong> Create new keys and
-              revoke old ones periodically for better security.
+              <strong className="text-foreground">{t("apiKeys.security.rotateLabel")}</strong>{" "}
+              {t("apiKeys.security.rotate")}
             </p>
             <p>
-              <strong className="text-foreground">Limit scope:</strong> Create separate keys for
-              different environments (development, staging, production).
+              <strong className="text-foreground">{t("apiKeys.security.scopeLabel")}</strong>{" "}
+              {t("apiKeys.security.scope")}
             </p>
           </CardContent>
         </Card>
@@ -371,14 +361,13 @@ export default function ApiKeys() {
         <AlertDialog open={!!keyToRevoke} onOpenChange={() => setKeyToRevoke(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+              <AlertDialogTitle>{t("apiKeys.revokeTitle")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to revoke this API key? Any applications using this key will
-                immediately lose access. This action cannot be undone.
+                {t("apiKeys.revokeDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() =>
                   keyToRevoke && revokeKey.mutate({ keyId: keyToRevoke, projectId: projectId! })
@@ -386,7 +375,7 @@ export default function ApiKeys() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {revokeKey.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Revoke Key
+                {t("apiKeys.revoke")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

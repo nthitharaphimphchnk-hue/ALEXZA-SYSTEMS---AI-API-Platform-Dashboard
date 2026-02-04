@@ -10,6 +10,7 @@ import { Copy, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "wouter";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type GeneralSettings = {
   name: string;
@@ -18,6 +19,7 @@ type GeneralSettings = {
 };
 
 export default function ProjectSettingsGeneral() {
+  const { t } = useLanguage();
   const params = useParams<{ id: string }>();
   const projectId = params.id ? parseInt(params.id) : null;
 
@@ -83,9 +85,9 @@ export default function ProjectSettingsGeneral() {
       localStorage.setItem(storageKey, JSON.stringify(next));
       setForm(next);
       setSaved(next);
-      toast.success("Saved");
+      toast.success(t("common.saved"));
     } catch {
-      toast.error("Save failed");
+      toast.error(t("common.saveFailed"));
     }
   };
 
@@ -94,10 +96,10 @@ export default function ProjectSettingsGeneral() {
     try {
       await navigator.clipboard.writeText(String(projectId));
       setCopied(true);
-      toast.success("Copied");
+      toast.success(t("common.copied"));
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error("Copy failed");
+      toast.error(t("common.copyFailed"));
     }
   };
 
@@ -105,32 +107,32 @@ export default function ProjectSettingsGeneral() {
     <ProjectDashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Project Settings</h1>
-          <p className="text-muted-foreground mt-1">General configuration for this project.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("settings.project.title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("settings.project.description")}</p>
         </div>
 
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle>General</CardTitle>
-            <CardDescription>Identity and access controls</CardDescription>
+            <CardTitle>{t("settings.general")}</CardTitle>
+            <CardDescription>{t("settings.generalDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="project-name">Project name</Label>
+                <Label htmlFor="project-name">{t("settings.project.name")}</Label>
                 <Input
                   id="project-name"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder={isLoading ? "Loading…" : "My Project"}
+                  placeholder={isLoading ? t("common.loading") : t("settings.project.namePlaceholder")}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Visible across dashboards and usage.
+                  {t("settings.project.nameHelp")}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="project-id">Project ID</Label>
+                <Label htmlFor="project-id">{t("settings.project.id")}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="project-id"
@@ -142,40 +144,40 @@ export default function ProjectSettingsGeneral() {
                     variant="outline"
                     size="icon"
                     onClick={handleCopyId}
-                    aria-label="Copy project id"
+                    aria-label={t("settings.project.copyId")}
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Use this ID for support or automation.
+                  {t("settings.project.idHelp")}
                 </p>
               </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-2">
-                <Label>Service tier</Label>
+                <Label>{t("settings.project.tier")}</Label>
                 <Select value={form.tier} onValueChange={() => {}}>
                   <SelectTrigger disabled>
-                    <SelectValue placeholder="Default" />
+                    <SelectValue placeholder={t("settings.project.tierDefault")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
+                    <SelectItem value="default">{t("settings.project.tierDefault")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Only default tier is available right now.
+                  {t("settings.project.tierHelp")}
                 </p>
               </div>
 
               <div className="space-y-3">
-                <Label>Disable user API keys</Label>
+                <Label>{t("settings.project.disableKeys")}</Label>
                 <div className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-3 bg-muted/20">
                   <div>
-                    <p className="text-sm font-medium">Disable keys for this project</p>
+                    <p className="text-sm font-medium">{t("settings.project.disableKeysTitle")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Existing keys remain visible but requests are blocked.
+                      {t("settings.project.disableKeysHelp")}
                     </p>
                   </div>
                   <Switch
@@ -190,7 +192,7 @@ export default function ProjectSettingsGeneral() {
 
             <div className="flex items-center justify-end">
               <Button onClick={handleSave} disabled={!isDirty}>
-                Save changes
+                {t("common.saveChanges")}
               </Button>
             </div>
           </CardContent>

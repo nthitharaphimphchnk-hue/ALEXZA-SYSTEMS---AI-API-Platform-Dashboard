@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type ApiStatus = "healthy" | "degraded" | "down";
 
@@ -8,25 +9,25 @@ interface ApiStatusIndicatorProps {
   className?: string;
 }
 
-const statusConfig: Record<ApiStatus, { label: string; color: string; pulse: boolean }> = {
-  healthy: {
-    label: "Operational",
-    color: "bg-green-500",
-    pulse: false,
-  },
-  degraded: {
-    label: "Degraded",
-    color: "bg-yellow-500",
-    pulse: true,
-  },
-  down: {
-    label: "Down",
-    color: "bg-destructive",
-    pulse: true,
-  },
-};
-
 export function ApiStatusIndicator({ status, showLabel = true, className }: ApiStatusIndicatorProps) {
+  const { t } = useLanguage();
+  const statusConfig: Record<ApiStatus, { label: string; color: string; pulse: boolean }> = {
+    healthy: {
+      label: t("status.operational"),
+      color: "bg-green-500",
+      pulse: false,
+    },
+    degraded: {
+      label: t("status.degraded"),
+      color: "bg-yellow-500",
+      pulse: true,
+    },
+    down: {
+      label: t("status.down"),
+      color: "bg-destructive",
+      pulse: true,
+    },
+  };
   const config = statusConfig[status];
 
   return (

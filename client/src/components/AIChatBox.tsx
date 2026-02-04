@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Loader2, Send, User, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Streamdown } from "streamdown";
 
 /**
@@ -114,12 +115,13 @@ export function AIChatBox({
   messages,
   onSendMessage,
   isLoading = false,
-  placeholder = "Type your message...",
+  placeholder,
   className,
   height = "600px",
-  emptyStateMessage = "Start a conversation with AI",
+  emptyStateMessage,
   suggestedPrompts,
 }: AIChatBoxProps) {
+  const { t } = useLanguage();
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -128,6 +130,8 @@ export function AIChatBox({
 
   // Filter out system messages
   const displayMessages = messages.filter((msg) => msg.role !== "system");
+  const resolvedPlaceholder = placeholder ?? t("aiChat.placeholder");
+  const resolvedEmptyStateMessage = emptyStateMessage ?? t("aiChat.emptyState");
 
   // Calculate min-height for last assistant message to push user message to top
   const [minHeightForLastMessage, setMinHeightForLastMessage] = useState(0);
@@ -203,7 +207,7 @@ export function AIChatBox({
             <div className="flex flex-1 flex-col items-center justify-center gap-6 text-muted-foreground">
               <div className="flex flex-col items-center gap-3">
                 <Sparkles className="size-12 opacity-20" />
-                <p className="text-sm">{emptyStateMessage}</p>
+                <p className="text-sm">{resolvedEmptyStateMessage}</p>
               </div>
 
               {suggestedPrompts && suggestedPrompts.length > 0 && (
@@ -313,7 +317,7 @@ export function AIChatBox({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           className="flex-1 max-h-32 resize-none min-h-9"
           rows={1}
         />

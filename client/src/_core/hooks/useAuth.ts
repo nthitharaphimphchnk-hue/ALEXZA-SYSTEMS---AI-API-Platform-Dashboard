@@ -1,15 +1,15 @@
 import { isMockMode } from "@/_core/mock/mockMode";
 import { getLoginUrl } from "@/const";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useMemo } from "react";
 
 export type AuthStatus = "disabled" | "authenticated" | "unauthenticated";
 
-export const MOCK_USER = {
+export const MOCK_USER_BASE = {
   id: 1,
   openId: "mock-dev-user",
-  name: "Dev User",
   email: "dev@local",
   loginMethod: "mock",
   role: "user" as const,
@@ -19,10 +19,11 @@ export const MOCK_USER = {
 };
 
 export function useAuth() {
+  const { t } = useLanguage();
   // Dev-only mock mode: usable UI without OAuth/DB.
   if (isMockMode()) {
     return {
-      user: MOCK_USER,
+      user: { ...MOCK_USER_BASE, name: t("mock.user.name") },
       loading: false,
       status: "authenticated" as AuthStatus,
       error: null,
@@ -55,7 +56,7 @@ export function useAuth() {
   const login = useCallback(() => {
     const url = getLoginUrl();
     if (!url) {
-      console.warn("OAuth not configured");
+                  console.warn("OAuth not configured");
       return;
     }
     window.location.assign(url);
